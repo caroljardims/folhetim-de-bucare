@@ -13,22 +13,30 @@ import { maybeFinalizeNight } from "../lib/finalize.js";
 import { processBotNightActions } from "../lib/bots.js";
 import { ensurePlayerPrivateDoc } from "../lib/playerPrivateScore.js";
 import { emptyBotKnowledge } from "../lib/botKnowledge/types.js";
-import { requireAuth } from "./shared.js";
+import { assertRoomHost, requireAuth } from "./shared.js";
+import { assertLocalDebugRequest } from "./debug/shared.js";
 
 export const createRoom = onCall(async (req) => {
   const uid = requireAuth(req);
   const name = String(req.data?.name ?? "Anfitrião").slice(0, 40);
+  const isDebug = Boolean(req.data?.debug);
+  if (isDebug) assertLocalDebugRequest(req);
 
   let code = randomCode();
   for (let i = 0; i < 10; i++) {
     const ref = db.collection("rooms").doc(code);
     const snap = await ref.get();
     if (!snap.exists) {
-      const playerId = randomId();
+      const clientPlayerId =
+        isDebug && typeof req.data?.playerId === "string"
+          ? String(req.data.playerId).trim()
+          : "";
+      const playerId = clientPlayerId.length > 0 ? clientPlayerId : randomId();
       const batch = db.batch();
       batch.set(ref, {
         code,
         hostUid: uid,
+        hostPlayerId: playerId,
         memberUids: [uid],
         status: "lobby",
         round: 0,
@@ -44,6 +52,9 @@ export const createRoom = onCall(async (req) => {
         votingOpen: false,
         mvpLedgerApplied: false,
         createdAt: FieldValue.serverTimestamp(),
+        ...(isDebug
+          ? { debug: true, debugShowAllRoles: true }
+          : {}),
       });
       batch.set(ref.collection("players").doc(playerId), {
         id: playerId,
@@ -55,6 +66,7 @@ export const createRoom = onCall(async (req) => {
         isSpokesperson: false,
       });
       await batch.commit();
+      if (isDebug) await ensurePlayerPrivateDoc(code, playerId, uid);
       return { roomCode: code, playerId };
     }
     code = randomCode();
@@ -79,7 +91,33 @@ export const joinRoom = onCall(async (req) => {
     throw new HttpsError("failed-precondition", "Sala cheia.");
   }
 
-  const playerId = randomId();
+  const isDebugRoom = room.debug === true;
+  if (isDebugRoom) assertLocalDebugRequest(req);
+
+  const clientPlayerId =
+    isDebugRoom && typeof req.data?.playerId === "string"
+      ? String(req.data.playerId).trim()
+      : "";
+  const existing = clientPlayerId
+    ? await roomRef.collection("players").doc(clientPlayerId).get()
+    : null;
+  if (existing?.exists) {
+    const prev = existing.data() ?? {};
+    if (Boolean(prev.isBot)) throw new HttpsError("failed-precondition", "ID reservado para bot.");
+    const prevUid = String(prev.uid ?? "");
+    const batch = db.batch();
+    const roomPatch: Record<string, unknown> = { memberUids: FieldValue.arrayUnion(uid) };
+    if (prevUid === String(room.hostUid ?? "") || clientPlayerId === String(room.hostPlayerId ?? "")) {
+      roomPatch.hostUid = uid;
+    }
+    batch.update(roomRef, roomPatch);
+    batch.update(roomRef.collection("players").doc(clientPlayerId), { uid, name });
+    await batch.commit();
+    await ensurePlayerPrivateDoc(code, clientPlayerId, uid);
+    return { roomCode: code, playerId: clientPlayerId };
+  }
+
+  const playerId = clientPlayerId.length > 0 ? clientPlayerId : randomId();
   const batch = db.batch();
   batch.update(roomRef, { memberUids: FieldValue.arrayUnion(uid) });
   batch.set(roomRef.collection("players").doc(playerId), {
@@ -92,6 +130,7 @@ export const joinRoom = onCall(async (req) => {
     isSpokesperson: false,
   });
   await batch.commit();
+  if (isDebugRoom) await ensurePlayerPrivateDoc(code, playerId, uid);
   return { roomCode: code, playerId };
 });
 
@@ -105,10 +144,10 @@ export const startGame = onCall(async (req) => {
   const roomSnap = await roomRef.get();
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
-  if (room.hostUid !== uid) throw new HttpsError("permission-denied", "Apenas o anfitrião inicia.");
   if (room.status !== "lobby") throw new HttpsError("failed-precondition", "Jogo já iniciado.");
 
   const players = await loadPlayers(code);
+  assertRoomHost(room, players, req, "Apenas o anfitrião inicia.");
   if (players.length < 5) throw new HttpsError("failed-precondition", "Mínimo 5 jogadores.");
 
   let deal: ReturnType<typeof dealRoles>;
@@ -280,8 +319,10 @@ export const addBots = onCall(async (req) => {
   const roomSnap = await roomRef.get();
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
-  if (room.hostUid !== uid) throw new HttpsError("permission-denied", "Apenas o anfitrião.");
   if (room.status !== "lobby") throw new HttpsError("failed-precondition", "Jogo já iniciado.");
+
+  const players = await loadPlayers(code);
+  assertRoomHost(room, players, req);
 
   const playersSnap = await roomRef.collection("players").get();
   const count = Math.min(requested, 20 - playersSnap.size);
@@ -321,8 +362,10 @@ export const restartGame = onCall(async (req) => {
   const roomSnap = await roomRef.get();
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
-  if (room.hostUid !== uid) throw new HttpsError("permission-denied", "Apenas o anfitrião pode recomeçar.");
   if (room.status !== "ended") throw new HttpsError("failed-precondition", "O jogo ainda não encerrou.");
+
+  const players = await loadPlayers(code);
+  assertRoomHost(room, players, req, "Apenas o anfitrião pode recomeçar.");
 
   await db.recursiveDelete(roomRef.collection("secrets"));
   await db.recursiveDelete(roomRef.collection("nightActions"));
@@ -332,7 +375,6 @@ export const restartGame = onCall(async (req) => {
   await db.recursiveDelete(roomRef.collection("playerPrivate"));
   await db.recursiveDelete(roomRef.collection("chat"));
 
-  const players = await loadPlayers(code);
   const batch = db.batch();
   for (const p of players) {
     batch.update(roomRef.collection("players").doc(p.id), {
@@ -386,6 +428,7 @@ export const restartGame = onCall(async (req) => {
     revealedRoles: {},
     mvpLedgerApplied: false,
     lastGameHistoryId: FieldValue.delete(),
+    endPodiumSnapshot: FieldValue.delete(),
     gameTablePlayerCount: FieldValue.delete(),
     collectiveEndKind: FieldValue.delete(),
     fiveTableMoradorIds: FieldValue.delete(),

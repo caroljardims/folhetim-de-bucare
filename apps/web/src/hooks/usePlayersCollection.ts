@@ -1,9 +1,10 @@
 import { collection, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 import type { PlayerDoc } from "../types.js";
 
 export function usePlayersCollection(roomCode: string): PlayerDoc[] {
+  const { db } = useFirebaseServices();
   const [players, setPlayers] = useState<PlayerDoc[]>([]);
   useEffect(() => {
     if (!roomCode) {
@@ -13,6 +14,6 @@ export function usePlayersCollection(roomCode: string): PlayerDoc[] {
     return onSnapshot(collection(db, "rooms", roomCode, "players"), (snap) =>
       setPlayers(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as PlayerDoc)),
     );
-  }, [roomCode]);
+  }, [roomCode, db]);
   return players;
 }

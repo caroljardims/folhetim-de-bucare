@@ -1,11 +1,9 @@
-import type { User } from "firebase/auth";
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -14,21 +12,15 @@ import {
   type ReactNode,
 } from "react";
 import { ensureUserProfile } from "../auth/ensureUserProfile.js";
-import { auth } from "../firebase.js";
-
-type AuthContextValue = {
-  user: User | null;
-  authReady: boolean;
-  signOutUser: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext, type AuthContextValue } from "./authContextValue.js";
+import { FirebaseServicesProvider, useFirebaseServices } from "./FirebaseServicesContext.js";
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+function AuthProviderInner({ children }: { children: ReactNode }) {
+  const { auth } = useFirebaseServices();
+  const [user, setUser] = useState<AuthContextValue["user"]>(null);
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
@@ -43,11 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setAuthReady(true);
     });
-  }, []);
+  }, [auth]);
 
   const signOutUser = useCallback(async () => {
     await firebaseSignOut(auth);
-  }, []);
+  }, [auth]);
 
   const value = useMemo(
     () => ({ user, authReady, signOutUser }),
@@ -55,6 +47,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <FirebaseServicesProvider>
+      <AuthProviderInner>{children}</AuthProviderInner>
+    </FirebaseServicesProvider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

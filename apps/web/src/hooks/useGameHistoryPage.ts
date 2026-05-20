@@ -10,7 +10,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 
 export type GameHistoryRow = {
   id: string;
@@ -34,6 +34,7 @@ export type GameHistoryRow = {
 const PAGE = 10;
 
 export function useGameHistoryPage(uid: string | undefined) {
+  const { db } = useFirebaseServices();
   const [rows, setRows] = useState<GameHistoryRow[]>([]);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);

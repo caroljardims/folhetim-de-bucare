@@ -4,7 +4,7 @@ import { db, loadPlayers, loadSecrets } from "../helpers.js";
 import { finalizeDay, maybeFinalizeDayIfAllVotesIn, tryEndGameCollective } from "../lib/finalize.js";
 import { clearPendingVotingFinalize } from "../lib/votingFinalize.js";
 import { canBeExpulsionVoteTarget, canSubmitExpulsionVote } from "../lib/playerVote.js";
-import { findPlayer, requireAuth } from "./shared.js";
+import { assertRoomHost, findPlayer, requireAuth } from "./shared.js";
 import { buildBotContext, getBotMessage, normalizePhraseKey } from "../lib/botChat/index.js";
 import { parseBotKnowledge } from "../lib/botKnowledge/merge.js";
 
@@ -164,8 +164,10 @@ export const advanceDay = onCall(async (req) => {
   const roomSnap = await roomRef.get();
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
-  if (room.hostUid !== uid) throw new HttpsError("permission-denied", "Apenas o anfitrião pode encerrar o dia.");
   if (room.status !== "day") throw new HttpsError("failed-precondition", "Não é fase do dia.");
+
+  const players = await loadPlayers(code);
+  assertRoomHost(room, players, req, "Apenas o anfitrião pode encerrar o dia.");
 
   const round = Number(room.votesRound ?? room.round ?? 1);
 

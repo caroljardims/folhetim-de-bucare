@@ -1,7 +1,7 @@
 import { collection, doc, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 
 export type LeaderRow = {
   uid: string;
@@ -12,6 +12,7 @@ export type LeaderRow = {
 };
 
 export function useLeaderboard(currentUid: string | undefined) {
+  const { db } = useFirebaseServices();
   const [top, setTop] = useState<LeaderRow[]>([]);
   const [mine, setMine] = useState<LeaderRow | null>(null);
 

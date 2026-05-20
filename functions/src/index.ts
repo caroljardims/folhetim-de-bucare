@@ -42,6 +42,9 @@ export {
 
 export {
   startDebugGame,
+  debugMasterRoomInfo,
+  rejoinDebugPlayer,
+  forceEndNight,
 } from "./handlers/debug/game.js";
 
 export {

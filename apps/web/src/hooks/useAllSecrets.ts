@@ -1,6 +1,6 @@
 import { collection, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 
 export type SecretDoc = {
   role?: string;
@@ -10,6 +10,7 @@ export type SecretDoc = {
  * Subscribe to `rooms/{code}/secrets` (read allowed for authed players per rules).
  */
 export function useAllSecrets(roomCode: string | "", enabled: boolean): Record<string, SecretDoc> {
+  const { db } = useFirebaseServices();
   const [secrets, setSecrets] = useState<Record<string, SecretDoc>>({});
 
   useEffect(() => {

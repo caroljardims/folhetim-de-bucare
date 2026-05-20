@@ -2,10 +2,10 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import type { RoleId } from "folclore-game-engine";
 import { maxRoundsForPlayerCount } from "folclore-game-engine";
-import { db, randomCode, randomId, ROLE_SIDE, startNightSequence } from "../../helpers.js";
+import { db, loadPlayers, randomCode, randomId, ROLE_SIDE, startNightSequence } from "../../helpers.js";
 import { ensurePlayerPrivateDoc } from "../../lib/playerPrivateScore.js";
 import { requireAuth } from "../shared.js";
-import { assertLocalDebugRequest } from "./shared.js";
+import { assertDebugHost, assertLocalDebugRequest } from "./shared.js";
 import { resolveDebugNightFully } from "./nightAdvance.js";
 
 const HOST_VOTE_SENTINEL = "__HOST__";
@@ -254,4 +254,133 @@ export const startDebugGame = onCall(async (req) => {
   }
 
   return { roomCode: code, playerId: humanPid };
+});
+
+/** Localhost master panel: room + players + roles + night submission flags (no auth). */
+export const debugMasterRoomInfo = onCall(async (req) => {
+  assertLocalDebugRequest(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  if (!code) throw new HttpsError("invalid-argument", "Código inválido.");
+
+  const roomRef = db.collection("rooms").doc(code);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
+  const room = roomSnap.data() ?? {};
+
+  const [players, secretsSnap, nightSnap] = await Promise.all([
+    loadPlayers(code),
+    roomRef.collection("secrets").get(),
+    room.status === "night"
+      ? roomRef.collection("nightActions").doc(String(room.round ?? 1)).get()
+      : Promise.resolve(null),
+  ]);
+
+  const secrets: Record<string, { role: string; side: string }> = {};
+  for (const d of secretsSnap.docs) {
+    const data = d.data();
+    secrets[d.id] = {
+      role: String(data.role ?? ""),
+      side: String(data.side ?? ""),
+    };
+  }
+
+  const nightSubmitted: Record<string, boolean> = {};
+  const nightData = nightSnap?.data() ?? {};
+  for (const p of players) {
+    if (!p.id || p.isBot) continue;
+    const entry = nightData[p.id] as { action?: string; role?: string } | undefined;
+    nightSubmitted[p.id] = Boolean(entry && typeof entry.action === "string");
+  }
+
+  const hostUid = String(room.hostUid ?? "");
+  const hostPlayerIdStored = String(room.hostPlayerId ?? "");
+  const hostPlayer =
+    (hostPlayerIdStored
+      ? players.find((p) => p.id === hostPlayerIdStored && !p.isBot)
+      : undefined) ?? players.find((p) => p.uid === hostUid && !p.isBot);
+
+  return {
+    room: {
+      code,
+      status: String(room.status ?? "lobby"),
+      phase: String(room.phase ?? room.status ?? "lobby"),
+      round: Number(room.round ?? 0),
+      currentActorRole: (room.currentActorRole as string | null) ?? null,
+      nightPendingRoles: (room.nightPendingRoles as string[]) ?? [],
+      nightReadyPlayerIds: (room.nightReadyPlayerIds as string[]) ?? [],
+      hostUid,
+      hostPlayerId: hostPlayer?.id ?? (hostPlayerIdStored || null),
+      debug: room.debug === true,
+    },
+    players: players.map((p) => ({
+      id: p.id,
+      name: String(p.name ?? ""),
+      uid: String(p.uid ?? ""),
+      alive: p.alive !== false,
+      eliminated: Boolean(p.eliminated),
+      expelled: Boolean(p.expelled),
+      isSpokesperson: Boolean(p.isSpokesperson),
+      isBot: Boolean(p.isBot),
+      role: secrets[p.id]?.role ?? null,
+      side: secrets[p.id]?.side ?? null,
+      nightSubmitted: nightSubmitted[p.id] ?? false,
+    })),
+  };
+});
+
+/** Reattach a debug human player to a new anonymous Auth uid (master panel reconnect). */
+export const rejoinDebugPlayer = onCall(async (req) => {
+  assertLocalDebugRequest(req);
+  const uid = requireAuth(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  const playerId = String(req.data?.playerId ?? "");
+  if (!code || !playerId) throw new HttpsError("invalid-argument", "Parâmetros inválidos.");
+
+  const roomRef = db.collection("rooms").doc(code);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
+  const room = roomSnap.data() ?? {};
+  if (room.debug !== true) throw new HttpsError("failed-precondition", "Não é sala debug.");
+
+  const playerRef = roomRef.collection("players").doc(playerId);
+  const playerSnap = await playerRef.get();
+  if (!playerSnap.exists) throw new HttpsError("not-found", "Jogador não encontrado.");
+  const prev = playerSnap.data() ?? {};
+  if (Boolean(prev.isBot)) throw new HttpsError("failed-precondition", "Bots não podem reentrar.");
+
+  const nameRaw = String(req.data?.name ?? "").trim().slice(0, 40);
+
+  const prevUid = String(prev.uid ?? "");
+  const batch = db.batch();
+  const roomPatch: Record<string, unknown> = { memberUids: FieldValue.arrayUnion(uid) };
+  if (prevUid === String(room.hostUid ?? "") || playerId === String(room.hostPlayerId ?? "")) {
+    roomPatch.hostUid = uid;
+  }
+  batch.update(roomRef, roomPatch);
+  batch.update(playerRef, {
+    uid,
+    ...(nameRaw.length > 0 ? { name: nameRaw } : {}),
+  });
+  await batch.commit();
+
+  await ensurePlayerPrivateDoc(code, playerId, uid);
+  return { ok: true, playerId, roomCode: code };
+});
+
+/** Force dawn during night (localhost debug host). */
+export const forceEndNight = onCall(async (req) => {
+  assertLocalDebugRequest(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  await assertDebugHost(req, code);
+
+  const roomRef = db.collection("rooms").doc(code);
+  const snap = await roomRef.get();
+  const room = snap.data() ?? {};
+  if (room.status !== "night") {
+    throw new HttpsError("failed-precondition", "Precisa estar de noite.");
+  }
+
+  await resolveDebugNightFully(code);
+  const after = await roomRef.get();
+  return { ok: true, status: String(after.data()?.status ?? "day") };
 });

@@ -1,7 +1,7 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { beginVotingFinalize, completeVotingFinalize } from "../lib/votingFinalize.js";
-import { requireAuth } from "./shared.js";
+import { assertRoomHost, requireAuth } from "./shared.js";
 
 export const requestVotingFinalize = onCall(async (req) => {
   const uid = requireAuth(req);
@@ -13,9 +13,9 @@ export const requestVotingFinalize = onCall(async (req) => {
   const roomSnap = await roomRef.get();
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
-  if (room.hostUid !== uid) {
-    throw new HttpsError("permission-denied", "Apenas o anfitrião pode finalizar a votação.");
-  }
+  const { loadPlayers } = await import("../helpers.js");
+  const players = await loadPlayers(code);
+  assertRoomHost(room, players, req, "Apenas o anfitrião pode finalizar a votação.");
   if (room.status !== "day") throw new HttpsError("failed-precondition", "Não é fase do dia.");
   if (room.votingOpen !== true) {
     throw new HttpsError("failed-precondition", "A votação já foi encerrada.");

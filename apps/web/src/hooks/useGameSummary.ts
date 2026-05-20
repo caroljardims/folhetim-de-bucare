@@ -1,6 +1,6 @@
 import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 
 export type GameSummaryPlayer = {
   playerId: string;
@@ -32,6 +32,7 @@ export type GameSummaryDoc = {
 };
 
 export function useGameSummary(gameId: string | undefined) {
+  const { db } = useFirebaseServices();
   const [summary, setSummary] = useState<GameSummaryDoc | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function useGameSummary(gameId: string | undefined) {
   useEffect(() => {
     if (!gameId) {
       setSummary(null);
-      setLoaded(false);
+      setLoaded(true);
       setError(null);
       return;
     }

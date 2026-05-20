@@ -41,8 +41,6 @@ export type NightScreenProps = {
   cangConsultTarget: string;
   setCangConsultTarget: (v: string) => void;
   nightToast: string | null;
-  delegadoIntroDismissed: boolean;
-  setDelegadoIntroDismissed: (v: boolean) => void;
   delegadoJustifyInlineError: boolean;
   setDelegadoJustifyInlineError: (v: boolean) => void;
   loreOpen: boolean;
@@ -119,8 +117,6 @@ export function NightScreen({
   cangConsultTarget,
   setCangConsultTarget,
   nightToast,
-  delegadoIntroDismissed,
-  setDelegadoIntroDismissed,
   delegadoJustifyInlineError,
   setDelegadoJustifyInlineError,
   loreOpen,
@@ -191,11 +187,6 @@ export function NightScreen({
     !meNight.expelled &&
     (!myRoleIsPending || nightActionSent);
   const suspicionPrimary = canMarkNightReady;
-  const delegadoIntroVisible =
-    myRoleIsPending &&
-    myRole === "delegado" &&
-    (room.round ?? 1) === 1 &&
-    !delegadoIntroDismissed;
   const delegadoJailSelectedName =
     nightTarget && myRole === "delegado" && nightAction === "jail"
       ? players.find((p) => p.id === nightTarget)?.name ?? "esta pessoa"
@@ -224,7 +215,7 @@ export function NightScreen({
   const lore = myRole ? ROLE_LORE[myRole] : null;
 
   const promptText = nightPrompt(myRole, {
-    myTurn: myRoleIsPending && !delegadoIntroVisible,
+    myTurn: myRoleIsPending,
     action: nightAction,
     suspicionOnly: suspicionPrimary && !myRoleIsPending,
     waiting: !myRoleIsPending && !suspicionPrimary,
@@ -346,34 +337,9 @@ export function NightScreen({
         </div>
       ) : null}
 
-      {delegadoIntroVisible ? (
-        <div className="delegado-night-intro-backdrop" role="dialog" aria-modal="true">
-          <div className="delegado-night-intro-card">
-            <h2 className="delegado-night-intro-title">👮 Sua vez, Delegado</h2>
-            <p className="delegado-night-intro-body">Você pode prender um suspeito esta noite.</p>
-            <p className="delegado-night-intro-body">
-              Se prender alguém, escreva uma justificativa — ela vai aparecer no Folhetim amanhã.
-            </p>
-            <p className="muted delegado-night-intro-timer-note">
-              Depois de continuar, você terá {NIGHT_ROLE_ACTION_SECONDS}s para enviar prender ou passar.
-            </p>
-            <button
-              type="button"
-              className="chip-btn delegado-night-intro-btn"
-              onClick={() => {
-                sessionStorage.setItem(`folhetim_delegado_night_intro_${roomCode}`, "1");
-                setDelegadoIntroDismissed(true);
-              }}
-            >
-              Entendi
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       {renderEtiqueta()}
 
-      {showCangConsult && !delegadoIntroVisible && (
+      {showCangConsult && (
         <div className="noite-cang-panel">
           <p className="noite-cang-panel__label muted">
             Consultar se a Geni já sabe de alguém? (opcional)
@@ -439,7 +405,7 @@ export function NightScreen({
 
       <p className="noite-prompt">{promptText}</p>
 
-      {myRoleIsPending && !delegadoIntroVisible && (
+      {myRoleIsPending && (
         <>
           {roleActionOptions.length > 1 && (
             <div className="noite-action-chips" role="group" aria-label="Ação">
@@ -539,7 +505,7 @@ export function NightScreen({
       )}
 
       <div className="noite-footer">
-        {myRoleIsPending && !delegadoIntroVisible ? (
+        {myRoleIsPending ? (
           <button
             type="button"
             className={`btn-noite${nightActionSent ? " vote-sent" : ""}`}

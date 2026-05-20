@@ -1,9 +1,10 @@
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 import type { ChatMessage } from "../types.js";
 
 export function useChat(roomCode: string, dayActive: boolean): ChatMessage[] {
+  const { db } = useFirebaseServices();
   const [chat, setChat] = useState<ChatMessage[]>([]);
   useEffect(() => {
     if (!roomCode || !dayActive) {

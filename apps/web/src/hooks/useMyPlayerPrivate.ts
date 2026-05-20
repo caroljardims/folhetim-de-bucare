@@ -1,6 +1,6 @@
 import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 
 export type PlayerPrivateDoc = {
   investigationTargetsUsed?: string[];
@@ -9,6 +9,7 @@ export type PlayerPrivateDoc = {
 };
 
 export function useMyPlayerPrivate(roomCode: string, playerId: string | undefined) {
+  const { db } = useFirebaseServices();
   const [data, setData] = useState<PlayerPrivateDoc | null>(null);
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export function useMyPlayerPrivate(roomCode: string, playerId: string | undefine
       () => setData(null),
     );
     return () => unsub();
-  }, [roomCode, playerId]);
+  }, [roomCode, playerId, db]);
 
   return data;
 }

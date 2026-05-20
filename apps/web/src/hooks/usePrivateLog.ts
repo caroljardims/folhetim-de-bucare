@@ -1,9 +1,10 @@
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 import type { PrivateLogEntry } from "../types.js";
 
 export function usePrivateLog(roomCode: string, playerId: string): PrivateLogEntry[] {
+  const { db } = useFirebaseServices();
   const [privateLog, setPrivateLog] = useState<PrivateLogEntry[]>([]);
   useEffect(() => {
     if (!roomCode || !playerId) {

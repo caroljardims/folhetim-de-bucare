@@ -16,6 +16,8 @@ export type View = "intro" | "create" | "join" | "joinName";
 export type RoomDoc = DocumentData & {
   status?: string;
   hostUid?: string;
+  /** Jogador anfitrião (estável no painel mestre; não muda com novo Auth uid). */
+  hostPlayerId?: string;
   round?: number;
   /** Teto de rodadas antes da vitória automática do folclore (lua cheia). */
   maxRounds?: number;
@@ -55,6 +57,18 @@ export type RoomDoc = DocumentData & {
   }>;
   lastGameHistoryId?: string;
   mvpLedgerApplied?: boolean;
+  /** Ranking final gravado no fim da partida (leitura direta na sala; fallback do pódio). */
+  endPodiumSnapshot?: Array<{
+    playerId: string;
+    displayName: string;
+    role: string;
+    side: string;
+    points: number;
+    rank: number;
+    isBot?: boolean;
+    individualObjectiveMet?: boolean;
+    collectiveWin?: boolean;
+  }>;
   /** Conversas da Geni: legado `string[]` ou `{ playerId, round, result }[]`. */
   geniInvestigatedTargets?: (string | GeniInvestigationRecord)[];
   /** Congelado em `startGame` (jogadores conectados ao iniciar). */

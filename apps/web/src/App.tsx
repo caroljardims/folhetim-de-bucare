@@ -12,7 +12,8 @@ import {
 import { AuthModal } from "./components/AuthModal.js";
 import { SaciGorroModal, type PendingGorro } from "./components/SaciGorroModal.js";
 import { useAuth } from "./context/AuthContext.js";
-import { auth, call } from "./firebase.js";
+import { useFirebaseServices } from "./context/FirebaseServicesContext.js";
+import { isMasterIframeClient } from "./auth/masterPlayerFirebase.js";
 import {
   ROLE_DISPLAY,
   ROLE_LORE,
@@ -66,10 +67,15 @@ const LS_GLYPH = "folclore_glyph";
 
 
 const DebugIntroChromeLazy = lazy(() => import("./debug/DebugIntroChrome.js"));
-const DebugGameChromeLazy = lazy(() => import("./debug/DebugGameChrome.js"));
 
-export function App() {
+export type AppProps = {
+  masterBootstrap?: { playerId: string; roomCode: string | null };
+};
+
+export function App({ masterBootstrap }: AppProps = {}) {
   const { user, authReady, signOutUser } = useAuth();
+  const { call, auth } = useFirebaseServices();
+  const masterIframe = isMasterIframeClient();
   const uid = user?.uid ?? null;
   const [err, setErr] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -122,8 +128,6 @@ export function App() {
   const [suspicionSent, setSuspicionSent] = useState(false);
   const [nightToast, setNightToast] = useState<string | null>(null);
   const [delegadoJustifyInlineError, setDelegadoJustifyInlineError] = useState(false);
-  const [delegadoIntroDismissed, setDelegadoIntroDismissed] = useState(false);
-
   // Batismo do personagem — folheto interativo antes da noite 1
   const [batismoSeen, setBatismoSeen] = useState<boolean>(() => {
     try { return sessionStorage.getItem(`batismo_${localStorage.getItem(LS_ROOM) ?? ""}`) === "1"; }
@@ -194,7 +198,6 @@ export function App() {
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [debugSetupOpen, setDebugSetupOpen] = useState(false);
-  const [debugSidebarOpen, setDebugSidebarOpen] = useState(false);
 
   const myPrivate = useMyPlayerPrivate(roomCode, playerId || undefined);
 
@@ -224,17 +227,13 @@ export function App() {
   }, [refreshAccountRoute]);
 
   useEffect(() => {
-    if (!isLocalDebug()) return;
+    if (!isLocalDebug() || masterIframe) return;
     const toggle = () => {
-      if (!roomCode) {
-        setDebugSetupOpen((prev) => !prev);
-      } else if (room?.debug === true) {
-        setDebugSidebarOpen((prev) => !prev);
-      }
+      if (!roomCode) setDebugSetupOpen((prev) => !prev);
     };
     window.addEventListener("folhetim-debug-toggle", toggle);
     return () => window.removeEventListener("folhetim-debug-toggle", toggle);
-  }, [roomCode, room?.debug]);
+  }, [roomCode, masterIframe]);
 
   useEffect(() => {
     setNightActionSent(false);
@@ -253,6 +252,29 @@ export function App() {
   }, [room?.status, room?.round, roomCode]);
 
   useEffect(() => {
+    if (!masterBootstrap) return;
+    const pid = masterBootstrap.playerId;
+    const code = masterBootstrap.roomCode?.toUpperCase().trim() ?? "";
+    if (pid) {
+      setPlayerId(pid);
+      localStorage.setItem(LS_PLAYER, pid);
+    }
+    if (code) {
+      setRoomCode(code);
+      localStorage.setItem(LS_ROOM, code);
+    }
+  }, [masterBootstrap]);
+
+  useEffect(() => {
+    if (!masterIframe || !authReady || !user || !masterBootstrap) return;
+    const code = masterBootstrap.roomCode?.toUpperCase().trim();
+    const pid = masterBootstrap.playerId;
+    if (!code || !pid) return;
+    void call("rejoinDebugPlayer")({ roomCode: code, playerId: pid }).catch(() => {});
+  }, [masterIframe, authReady, user, masterBootstrap, call]);
+
+  useEffect(() => {
+    if (masterIframe) return;
     if (!authReady || user) return;
     if (roomCode || playerId) {
       localStorage.removeItem(LS_ROOM);
@@ -262,7 +284,7 @@ export function App() {
       setAmHost(false);
       setView("intro");
     }
-  }, [authReady, user, roomCode, playerId]);
+  }, [authReady, user, roomCode, playerId, masterIframe]);
 
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -307,7 +329,12 @@ export function App() {
     return () => cancelAnimationFrame(t);
   }, [view]);
 
-  const isHost = !!(room?.hostUid && uid === room.hostUid);
+  const hostPlayerId = useMemo(() => {
+    const fromRoom = room?.hostPlayerId;
+    if (fromRoom) return fromRoom;
+    return players.find((p) => p.uid === room?.hostUid)?.id ?? null;
+  }, [players, room?.hostUid, room?.hostPlayerId]);
+  const isHost = !!(playerId && hostPlayerId && playerId === hostPlayerId);
 
   const formatDebugPlayerOpt = useCallback(
     (p: PlayerDoc) => {
@@ -344,11 +371,6 @@ export function App() {
   );
 
   useEffect(() => {
-    if (!roomCode || typeof sessionStorage === "undefined") return;
-    setDelegadoIntroDismissed(sessionStorage.getItem(`folhetim_delegado_night_intro_${roomCode}`) === "1");
-  }, [roomCode]);
-
-  useEffect(() => {
     setDelegadoJustifyInlineError(false);
   }, [nightTarget, nightSpecialAction, nightAction]);
 
@@ -358,7 +380,6 @@ export function App() {
     if (room?.status !== "night" || myRole !== "delegado") return;
     if (!room.nightPendingRoles?.includes("delegado")) return;
     if (nightActionSent) return;
-    if ((room.round ?? 1) === 1 && !delegadoIntroDismissed) return;
 
     const t = window.setTimeout(() => {
       void run(
@@ -382,7 +403,6 @@ export function App() {
     myRole,
     nightActionSent,
     roomCode,
-    delegadoIntroDismissed,
     run,
   ]);
 
@@ -445,19 +465,7 @@ export function App() {
     setAmHost(false);
     setView("intro");
     setDebugSetupOpen(false);
-    setDebugSidebarOpen(false);
   };
-
-  const handleDebugEntered = useCallback((code: string, pid: string) => {
-    const normalized = code.toUpperCase().trim();
-    setRoomCode(normalized);
-    setPlayerId(pid);
-    setAmHost(true);
-    localStorage.setItem(LS_ROOM, normalized);
-    localStorage.setItem(LS_PLAYER, pid);
-    setErr(null);
-    setDebugSetupOpen(false);
-  }, []);
 
   const copyCode = () => {
     copyToClipboard(roomCode);
@@ -740,8 +748,6 @@ export function App() {
         <DebugIntroChromeLazy
           panelOpen={debugSetupOpen}
           onPanelOpenChange={setDebugSetupOpen}
-          onEntered={handleDebugEntered}
-          onApiError={setErr}
         />
       </Suspense>
     ) : null;
@@ -1114,25 +1120,10 @@ export function App() {
     </div>
   );
 
-  const isDebugSession = !!(room && isLocalDebug() && room.debug === true);
-
   return (
     <>
-      {isDebugSession && room && (
-        <Suspense fallback={null}>
-          <DebugGameChromeLazy
-            roomCode={roomCode}
-            room={room}
-            players={players}
-            secrets={debugSecrets}
-            sidebarOpen={debugSidebarOpen}
-            onSidebarToggle={() => setDebugSidebarOpen((prev) => !prev)}
-            onCallableError={(m) => setErr(m)}
-          />
-        </Suspense>
-      )}
       <div
-        className={`page${isDebugSession ? " page--debug" : ""}${
+        className={`page${
           room?.status === "night"
             ? " fase--noite"
             : showAmanhecer
@@ -1265,7 +1256,7 @@ export function App() {
                         {p.id === playerId && (
                           <span className="player-tag">você</span>
                         )}
-                        {p.uid === room?.hostUid && (
+                        {hostPlayerId === p.id && (
                           <span className="player-tag player-tag-host">
                             anfitrião
                           </span>
@@ -1414,8 +1405,6 @@ export function App() {
           cangConsultTarget={cangConsultTarget}
           setCangConsultTarget={setCangConsultTarget}
           nightToast={nightToast}
-          delegadoIntroDismissed={delegadoIntroDismissed}
-          setDelegadoIntroDismissed={setDelegadoIntroDismissed}
           delegadoJustifyInlineError={delegadoJustifyInlineError}
           setDelegadoJustifyInlineError={setDelegadoJustifyInlineError}
           loreOpen={loreOpen}

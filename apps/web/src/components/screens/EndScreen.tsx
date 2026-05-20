@@ -5,9 +5,14 @@ import { FolhetimEdition } from "../FolhetimEdition.js";
 import { PartidaChronicle } from "../game/PartidaChronicle.js";
 import { buildEndManchete } from "../../lib/endGameManchete.js";
 import { listCityExpulsions } from "../../lib/cityExpulsions.js";
+import {
+  hasRealPodiumPoints,
+  podiumTopThree,
+  resolvePodiumPlayers,
+} from "../../lib/endPodium.js";
 import { stablePlayerGlyph } from "../../lib/playerGlyph.js";
 import { ROLE_DISPLAY, ROLE_LORE, RoleLoreContent } from "../../lib/roleStories.js";
-import { useGameSummary, type GameSummaryPlayer } from "../../hooks/useGameSummary.js";
+import { useGameSummary } from "../../hooks/useGameSummary.js";
 import type { PlayerDoc, PublicLogEntry, RoomDoc } from "../../types.js";
 
 type NightActionRow = Record<
@@ -70,16 +75,6 @@ const PODIUM_VISUAL = [
   { index: 2, place: 3 },
 ] as const;
 
-function podiumTopThree(players: GameSummaryPlayer[]) {
-  return [...players]
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (a.rank !== b.rank) return a.rank - b.rank;
-      return a.displayName.localeCompare(b.displayName, "pt");
-    })
-    .slice(0, 3);
-}
-
 function EndPagesNav({
   page,
   onPrev,
@@ -139,7 +134,12 @@ export function EndScreen({
   const goPrev = () => setEndPage((p) => (p > 0 ? ((p - 1) as 0 | 1 | 2) : p));
   const goNext = () => setEndPage((p) => (p < 2 ? ((p + 1) as 0 | 1 | 2) : p));
 
-  const podiumRows = summary?.players ? podiumTopThree(summary.players) : [];
+  const podiumSource = useMemo(
+    () => resolvePodiumPlayers(summary?.players, room, players),
+    [summary?.players, room, players],
+  );
+  const podiumRows = useMemo(() => podiumTopThree(podiumSource), [podiumSource]);
+  const podiumHasPoints = hasRealPodiumPoints(podiumSource);
   const cityExpulsions = useMemo(
     () => listCityExpulsions(players, publicLog),
     [players, publicLog],
@@ -268,18 +268,25 @@ export function EndScreen({
                   <span className="podio__nome">{row.displayName}</span>
                   <div className="podio__base">
                     <span>{ROMAN[place - 1]}</span>
-                    <span className="podio__pts">{row.points} pts</span>
+                    <span className="podio__pts">
+                      {podiumHasPoints ? `${row.points} pts` : "—"}
+                    </span>
                   </div>
                 </div>
               );
             })}
           </div>
-          {!summaryLoaded && (
+          {!summaryLoaded && podiumRows.length === 0 && (
             <p className="muted fim-podio-loading">Carregando pontuação…</p>
           )}
-          {summaryError && <p className="muted fim-podio-loading">{summaryError}</p>}
-          {summaryLoaded && podiumRows.length === 0 && (
+          {summaryError && podiumRows.length === 0 && (
+            <p className="muted fim-podio-loading">{summaryError}</p>
+          )}
+          {summaryLoaded && podiumRows.length === 0 && !summaryError && (
             <p className="muted fim-podio-loading">Resumo de pontos ainda não disponível.</p>
+          )}
+          {podiumRows.length > 0 && !podiumHasPoints && (
+            <p className="muted fim-podio-loading">Pontuação detalhada indisponível — ordem por desempenho na mesa.</p>
           )}
 
           <article className="folhetim folhetim--edition folhetim--fim-cronica folhetim-card">

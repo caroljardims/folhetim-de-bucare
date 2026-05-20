@@ -60,10 +60,7 @@ export async function finalizeMvpLedgerIfNeeded(roomCode: string): Promise<void>
   const roomSnap = await roomRef.get();
   const room = roomSnap.data() ?? {};
   if (room.status !== "ended" || room.mvpLedgerApplied === true) return;
-  if (room.debug === true) {
-    await roomRef.update({ mvpLedgerApplied: true });
-    return;
-  }
+  const skipPublicLedger = room.debug === true;
 
   const winner = String(room.winner ?? "");
   const finalRound = Number(room.round ?? 1);
@@ -161,13 +158,12 @@ export async function finalizeMvpLedgerIfNeeded(roomCode: string): Promise<void>
     };
   });
 
-  // Gravar pontos de todos os jogadores humanos em paralelo ANTES de setar
-  // mvpLedgerApplied. Se qualquer transação falhar, a função pode ser
-  // reexecutada sem perda permanente de pontos.
-  await Promise.all(
-    rows
-      .filter((r) => !r.isBot && r.uid && !r.uid.startsWith("bot_"))
-      .map((r) => {
+  // Gravar pontos globais (users / ranking). Salas debug só persistem o resumo da partida.
+  if (!skipPublicLedger) {
+    await Promise.all(
+      rows
+        .filter((r) => !r.isBot && r.uid && !r.uid.startsWith("bot_"))
+        .map((r) => {
         const rank = rankById.get(r.id) ?? 99;
         const uref = db.collection("users").doc(r.uid);
         const pref = db.collection("publicLeaderboard").doc(r.uid);
@@ -218,10 +214,9 @@ export async function finalizeMvpLedgerIfNeeded(roomCode: string): Promise<void>
           );
         });
       }),
-  );
+    );
+  }
 
-  // Só marca como aplicado depois que todas as transações de usuário tiverem
-  // sucesso — garantindo que uma reexecução sempre parta do zero seguro.
   const batch = db.batch();
   batch.set(db.collection("gameHistory").doc(gameId), {
     roomCode,
@@ -231,6 +226,10 @@ export async function finalizeMvpLedgerIfNeeded(roomCode: string): Promise<void>
     players: historyPlayers,
     participantUids,
   });
-  batch.update(roomRef, { mvpLedgerApplied: true, lastGameHistoryId: gameId });
+  batch.update(roomRef, {
+    mvpLedgerApplied: true,
+    lastGameHistoryId: gameId,
+    endPodiumSnapshot: historyPlayers,
+  });
   await batch.commit();
 }

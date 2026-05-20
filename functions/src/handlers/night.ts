@@ -6,7 +6,7 @@ import { db, loadPlayers, loadSecrets, startNightSequence } from "../helpers.js"
 import { maybeFinalizeNight } from "../lib/finalize.js";
 import { processBotNightActions } from "../lib/bots.js";
 import { setNightSuspicion } from "../lib/playerPrivateScore.js";
-import { findPlayer, requireAuth } from "./shared.js";
+import { assertRoomHost, findPlayer, requireAuth } from "./shared.js";
 
 function sanitizeDelegadoJustification(raw: string | null | undefined): string | null {
   if (raw == null) return null;
@@ -261,7 +261,8 @@ export const startNight = onCall(async (req) => {
   const roomSnap = await roomRef.get();
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
-  if (room.hostUid !== uid) throw new HttpsError("permission-denied", "Apenas o anfitrião pode iniciar a noite.");
+  const players = await loadPlayers(code);
+  assertRoomHost(room, players, req, "Apenas o anfitrião pode iniciar a noite.");
   if (!room.pendingNightStart) throw new HttpsError("failed-precondition", "Noite ainda não pronta para iniciar.");
 
   const nextRound = Number(room.pendingNightRound ?? (Number(room.round ?? 1) + 1));

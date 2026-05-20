@@ -18,3 +18,22 @@ export function findPlayer(players: AnyPlayer[], req: CallableRequest): AnyPlaye
   if (!uid) return undefined;
   return players.find((p) => p.uid === uid && !p.isBot);
 }
+
+/** Anfitrião: `hostUid` (Auth) ou `hostPlayerId` (mesa debug / master panel). */
+export function assertRoomHost(
+  room: Record<string, unknown>,
+  players: AnyPlayer[],
+  req: CallableRequest,
+  message = "Apenas o anfitrião.",
+): void {
+  const uid = requireAuth(req);
+  const hostUid = String(room.hostUid ?? "");
+  const hostPlayerId = String(room.hostPlayerId ?? "");
+  const me = findPlayer(players, req);
+  if (!me) throw new HttpsError("permission-denied", "Você não está nesta sala.");
+  if (hostUid && uid === hostUid) return;
+  if (hostPlayerId && me.id === hostPlayerId) return;
+  const legacyHost = players.find((p) => p.uid === hostUid && !p.isBot);
+  if (legacyHost && me.id === legacyHost.id) return;
+  throw new HttpsError("permission-denied", message);
+}

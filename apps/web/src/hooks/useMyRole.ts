@@ -1,8 +1,9 @@
 import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 
 export function useMyRole(roomCode: string, playerId: string): string | null {
+  const { db } = useFirebaseServices();
   const [myRole, setMyRole] = useState<string | null>(null);
   useEffect(() => {
     if (!roomCode || !playerId) {

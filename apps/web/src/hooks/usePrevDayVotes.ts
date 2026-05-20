@@ -1,12 +1,13 @@
 import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 import type { RoomDoc } from "../types.js";
 
 export function usePrevDayVotes(
   roomCode: string,
   room: RoomDoc | null,
 ): Record<string, string | null> {
+  const { db } = useFirebaseServices();
   const [votes, setVotes] = useState<Record<string, string | null>>({});
   useEffect(() => {
     if (!roomCode || !room || room.status !== "night" || (room.round ?? 1) <= 1) {

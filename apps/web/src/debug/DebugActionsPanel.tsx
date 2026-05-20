@@ -4,9 +4,10 @@
 import { doc, getDoc } from "firebase/firestore";
 import type { RoleId } from "folclore-game-engine";
 import { useCallback, useState } from "react";
-import { call, db } from "../firebase.js";
+import { useFirebaseServices } from "../context/FirebaseServicesContext.js";
 import { mapCallableError } from "../lib/callableErrors.js";
 import type { PlayerDoc } from "../types.js";
+import { openMasterDebugPanel } from "../lib/masterDebugRoute.js";
 import { DEBUG_ALL_ROLES, DEBUG_ROLE_LABELS } from "./roleOptions.js";
 
 type Props = {
@@ -37,6 +38,7 @@ const NIGHT_ACTIONS = [
 ];
 
 export function DebugActionsPanel({ roomCode, players, open, onToggle, onError }: Props) {
+  const { call, db } = useFirebaseServices();
   const [busy, setBusy] = useState<string | null>(null);
   const [roomJson, setRoomJson] = useState<string | null>(null);
   const [logPlayerId, setLogPlayerId] = useState("");
@@ -97,6 +99,13 @@ export function DebugActionsPanel({ roomCode, players, open, onToggle, onError }
       {open && (
         <aside className="debug-sidebar">
           <h3 className="debug-sidebar-title">Ações debug</h3>
+
+          <div className="debug-sidebar-group">
+            <button type="button" className="chip-btn" onClick={() => openMasterDebugPanel()}>
+              ⊞ Painel Mestre
+            </button>
+            <p className="muted small">Abre /debug/master em nova aba (simular todos os jogadores).</p>
+          </div>
 
           <div className="debug-sidebar-group">
             <button
