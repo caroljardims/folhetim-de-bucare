@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { BtnSpinner } from "../BtnSpinner.js";
 import { FolhetimEdition } from "../FolhetimEdition.js";
 import { PartidaChronicle } from "../game/PartidaChronicle.js";
 import { buildEndManchete } from "../../lib/endGameManchete.js";
+import { listCityExpulsions } from "../../lib/cityExpulsions.js";
 import { stablePlayerGlyph } from "../../lib/playerGlyph.js";
 import { ROLE_DISPLAY, ROLE_LORE, RoleLoreContent } from "../../lib/roleStories.js";
 import { useGameSummary, type GameSummaryPlayer } from "../../hooks/useGameSummary.js";
@@ -139,6 +140,10 @@ export function EndScreen({
   const goNext = () => setEndPage((p) => (p < 2 ? ((p + 1) as 0 | 1 | 2) : p));
 
   const podiumRows = summary?.players ? podiumTopThree(summary.players) : [];
+  const cityExpulsions = useMemo(
+    () => listCityExpulsions(players, publicLog),
+    [players, publicLog],
+  );
 
   return (
     <div className="screen screen--fim">
@@ -181,6 +186,29 @@ export function EndScreen({
         <section className="fim-page fim-page--revelacao pageflip-enter" aria-label="Revelação final">
           <p className="fim-section-eyebrow">II · a revelação</p>
           <p className="fim-section-tagline">agora a vila sabe quem era cada um.</p>
+
+          {cityExpulsions.length > 0 && (
+            <div className="fim-expulsos" aria-label="Expulsos da cidade">
+              <p className="fim-expulsos__title">Expulsos da cidade</p>
+              <ul className="fim-expulsos__list">
+                {cityExpulsions.map((row) => {
+                  const role = revealed[row.playerId];
+                  const roleLabel = role ? (ROLE_DISPLAY[role] ?? role) : null;
+                  return (
+                    <li key={row.playerId} className="fim-expulsos__item">
+                      <span className="fim-expulsos__name">{row.name}</span>
+                      {row.round != null && (
+                        <span className="fim-expulsos__meta">rodada {row.round}</span>
+                      )}
+                      {roleLabel && (
+                        <span className="fim-expulsos__meta">era {roleLabel}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           <ul className="fim-revelacao-list">
             {players.map((p) => {

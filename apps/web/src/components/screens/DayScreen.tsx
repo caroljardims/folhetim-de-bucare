@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AmanhecerFolhetim } from "../../lib/amanhecerContent.js";
 import {
   canShowCangaceiroTiro,
@@ -9,6 +9,7 @@ import { canBeExpulsionVoteTarget, canSubmitExpulsionVote } from "../../lib/play
 import { stablePlayerGlyph } from "../../lib/playerGlyph.js";
 import { ROLE_DISPLAY, ROLE_LORE, ROLE_XILO, RoleLoreContent } from "../../lib/roleStories.js";
 import type { ChatMessage, PlayerDoc, RoomDoc } from "../../types.js";
+import { groupChatByDay } from "../../lib/chatByDay.js";
 import { hasPendingVotingFinalize } from "../../lib/votingFinalize.js";
 import { BtnSpinner } from "../BtnSpinner.js";
 import { VotingFinalizeBanner } from "../day/VotingFinalizeBanner.js";
@@ -170,6 +171,13 @@ export function DayScreen({
   const [voteSheetOpen, setVoteSheetOpen] = useState(false);
   const [refolhetimOpen, setRefolhetimOpen] = useState(false);
   const [tiroOpen, setTiroOpen] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const currentDayHeadRef = useRef<HTMLDivElement>(null);
+
+  const chatByDay = useMemo(
+    () => groupChatByDay(chat, currentRound),
+    [chat, currentRound],
+  );
 
   useEffect(() => {
     setDayStage(1);
@@ -177,6 +185,13 @@ export function DayScreen({
     setRefolhetimOpen(false);
     setTiroOpen(false);
   }, [currentRound]);
+
+  useLayoutEffect(() => {
+    const container = chatScrollRef.current;
+    const head = currentDayHeadRef.current;
+    if (!container || !head) return;
+    container.scrollTop = Math.max(0, head.offsetTop - container.offsetTop);
+  }, [currentRound, chatByDay.length]);
 
   const myPlayer = players.find((p) => p.id === playerId);
   const canVote = !!(myPlayer && canSubmitExpulsionVote(myPlayer));
@@ -371,28 +386,38 @@ export function DayScreen({
         />
       )}
 
-      <div className="dia-chat" role="log" aria-live="polite">
-        {chat.length === 0 ? (
-          <p className="dia-chat__empty muted">A praça está em silêncio… por enquanto.</p>
-        ) : (
-          chat.map((m) => {
-            const isVote = (m as { type?: string }).type === "vote";
-            if (isVote) {
-              return (
-                <p key={m.id} className="dia-chat__vote-line muted">
-                  {formatVoteChatLine(m.name, m.text)}
-                </p>
-              );
-            }
-            return (
-              <article key={m.id} className="dia-chat__bubble">
-                <p className="dia-chat__author">{(m.name ?? "?").toUpperCase()}</p>
-                <p className="dia-chat__text">{m.text}</p>
-              </article>
-            );
-          })
-        )}
-      </div>
+      <div ref={chatScrollRef} className="dia-chat" role="log" aria-live="polite">
+          {chat.length === 0 ? (
+            <p className="dia-chat__empty muted">A praça está em silêncio… por enquanto.</p>
+          ) : (
+            chatByDay.map(({ day, messages }) => (
+            <section key={day} className="dia-chat__day" aria-label={`Dia ${day}`}>
+              <div
+                ref={day === currentRound ? currentDayHeadRef : undefined}
+                className={`dia-chat__day-head${day === currentRound ? " dia-chat__day-head--current" : ""}`}
+              >
+                <span className="dia-chat__day-label">Dia {day}</span>
+              </div>
+                {messages.map((m) => {
+                  const isVote = m.type === "vote";
+                  if (isVote) {
+                    return (
+                      <p key={m.id} className="dia-chat__vote-line muted">
+                        {formatVoteChatLine(m.name, m.text)}
+                      </p>
+                    );
+                  }
+                  return (
+                    <article key={m.id} className="dia-chat__bubble">
+                      <p className="dia-chat__author">{(m.name ?? "?").toUpperCase()}</p>
+                      <p className="dia-chat__text">{m.text}</p>
+                    </article>
+                  );
+                })}
+              </section>
+            ))
+          )}
+        </div>
 
       {dayStage === 1 && !canChat && myPlayer && (
         <p className="dia-status muted">

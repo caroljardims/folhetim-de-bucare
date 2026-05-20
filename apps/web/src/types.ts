@@ -102,4 +102,11 @@ export type PlayerDoc = DocumentData & {
 
 export type PublicLogEntry = { id: string; message?: string; round?: number; type?: string; roleName?: string };
 export type PrivateLogEntry = { id: string; message?: string; round?: number };
-export type ChatMessage = { id: string; name?: string; text?: string; type?: string };
+export type ChatMessage = {
+  id: string;
+  name?: string;
+  text?: string;
+  type?: string;
+  /** Rodada do dia em que a mensagem foi enviada (agrupa o chat por dia). */
+  votesRound?: number;
+};

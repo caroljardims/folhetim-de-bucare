@@ -4073,7 +4073,7 @@ input::placeholder {
 
 .dia-chat {
   flex: 1;
-  min-height: 120px;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -4090,6 +4090,44 @@ input::placeholder {
   color: var(--texto-poeira);
   margin: auto 0;
   padding: 28px 16px;
+}
+
+.dia-chat__day {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dia-chat__day-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 8px;
+  margin: 0 0 4px;
+}
+
+.dia-chat__day-head::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(166, 139, 103, 0.28);
+}
+
+.dia-chat__day-head--current {
+  margin-top: 4px;
+}
+
+.dia-chat__day-head--current .dia-chat__day-label {
+  color: var(--ouro-bucare);
+}
+
+.dia-chat__day-label {
+  font-family: var(--ff-headline);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--texto-medio);
+  white-space: nowrap;
 }
 
 .dia-chat__bubble {
@@ -5426,6 +5464,53 @@ input::placeholder {
   text-align: center;
   color: var(--texto-medio);
   margin: 0 0 8px;
+}
+
+.fim-expulsos {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(166, 139, 103, 0.32);
+  border-radius: 6px;
+  background: rgba(8, 6, 4, 0.4);
+}
+
+.fim-expulsos__title {
+  font-family: var(--ff-headline);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ouro-bucare);
+  margin: 0 0 10px;
+}
+
+.fim-expulsos__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fim-expulsos__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-family: var(--ff-serif);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink-cream);
+}
+
+.fim-expulsos__name {
+  font-weight: 600;
+}
+
+.fim-expulsos__meta {
+  font-size: 13px;
+  color: var(--texto-poeira);
+  font-style: italic;
 }
 
 .fim-revelacao-list {
