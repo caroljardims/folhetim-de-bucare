@@ -19,7 +19,7 @@ export function countsAsMoradorForMajority(p: WinPlayerSnapshot): boolean {
   const side = ROLE_SIDE[p.role];
   if (side === "morador") return true;
   if (side !== "neutro") return false;
-  if (p.role === "bras_cubas") return false;
+  if (p.role === "bras_cubas") return true;
   return p.alignment === "moradores";
 }
 

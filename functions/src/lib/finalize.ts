@@ -16,7 +16,7 @@ import { db } from "./db.js";
 import { loadPlayers, loadSecrets } from "../helpers.js";
 import { finalizeMvpLedgerIfNeeded } from "./endGameScoring.js";
 import { grantAldeaoObjectiveIfMoradoresWon, grantObjectiveMvp } from "./playerPrivateScore.js";
-import { scoreBrasRoundTease, scoreMvpAtDawn, scoreMvpVotesAfterDay } from "./mvpDawnAndVoteScoring.js";
+import { scoreMvpAtDawn } from "./mvpDawnAndVoteScoring.js";
 import { beginSaciGorroOffer, runPostExpulsionTail } from "./saciGorro.js";
 import { buildBotContext, getBotSegmentsForDayOpen, normalizePhraseKey } from "./botChat/index.js";
 import { mergeBotKnowledgeFromNightResolve } from "./botKnowledge/applyFromNightResolve.js";
@@ -1051,10 +1051,17 @@ export async function finalizeDay(roomCode: string, round: number) {
   }
 
   const batch = db.batch();
+  let isBotBrasExpelled = false;
   if (tally.expelledId) {
     const expelled = players.find((p) => p.id === tally.expelledId)!;
     const role = secrets[tally.expelledId]!.role;
-    batch.update(roomRef.collection("players").doc(tally.expelledId), { alive: false, expelled: true });
+    const isBotBras = role === "bras_cubas" && Boolean(expelled.isBot);
+    isBotBrasExpelled = isBotBras;
+    batch.update(roomRef.collection("players").doc(tally.expelledId), {
+      alive: false,
+      expelled: true,
+      ...(isBotBras ? { individualObjectiveMet: true } : {}),
+    });
     const msg =
       role === "bras_cubas"
         ? `Espera. ${expelled.name} sorri. Era o Tolo — e ser expulso era exatamente o que queria.`
@@ -1066,19 +1073,42 @@ export async function finalizeDay(roomCode: string, round: number) {
       timestamp: Date.now(),
       createdAt: FieldValue.serverTimestamp(),
     });
-    const roomBatchUpdate: Record<string, unknown> = {
-      votingOpen: false,
-      ...(role === "bras_cubas" ? { pendingBrasChoice: true } : {}),
-    };
-    if (role === "padre") {
-      const mulaPlayer = players.find((p) => secrets[p.id]?.role === "mula");
-      if (mulaPlayer && !mulaPlayer.individualObjectiveMet) {
-        batch.update(roomRef.collection("players").doc(mulaPlayer.id), { individualObjectiveMet: true });
-        const mulaWin = { playerId: mulaPlayer.id, role: "mula", type: "mula_padre", round, timestamp: Date.now() };
-        roomBatchUpdate.individualWins = FieldValue.arrayUnion(mulaWin);
+    if (isBotBras) {
+      const revealedRoles: Record<string, string> = {};
+      for (const p of players) {
+        const r = secrets[p.id]?.role;
+        if (r) revealedRoles[p.id] = r;
       }
+      batch.update(roomRef, {
+        votingOpen: false,
+        status: "ended",
+        phase: "ended",
+        winner: tally.expelledId,
+        pendingBrasChoice: false,
+        revealedRoles,
+        individualWins: FieldValue.arrayUnion({
+          playerId: tally.expelledId,
+          role: "bras_cubas",
+          type: "bras_tolo_encerra",
+          round,
+          timestamp: Date.now(),
+        }),
+      });
+    } else {
+      const roomBatchUpdate: Record<string, unknown> = {
+        votingOpen: false,
+        ...(role === "bras_cubas" ? { pendingBrasChoice: true } : {}),
+      };
+      if (role === "padre") {
+        const mulaPlayer = players.find((p) => secrets[p.id]?.role === "mula");
+        if (mulaPlayer && !mulaPlayer.individualObjectiveMet) {
+          batch.update(roomRef.collection("players").doc(mulaPlayer.id), { individualObjectiveMet: true });
+          const mulaWin = { playerId: mulaPlayer.id, role: "mula", type: "mula_padre", round, timestamp: Date.now() };
+          roomBatchUpdate.individualWins = FieldValue.arrayUnion(mulaWin);
+        }
+      }
+      batch.update(roomRef, roomBatchUpdate);
     }
-    batch.update(roomRef, roomBatchUpdate);
   } else {
     batch.update(roomRef, { votingOpen: false });
     batch.set(roomRef.collection("publicLogEntries").doc(), {
@@ -1100,6 +1130,12 @@ export async function finalizeDay(roomCode: string, round: number) {
   }
 
   await batch.commit();
+
+  if (isBotBrasExpelled) {
+    await grantObjectiveMvp(roomCode, tally.expelledId!, round).catch(console.error);
+    await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
+    return;
+  }
 
   if (tally.expelledId) {
     await runPostExpulsionTail(roomCode, round, tally.expelledId, voteRecord, brasId);

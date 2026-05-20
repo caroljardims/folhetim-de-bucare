@@ -76,10 +76,19 @@ describe("checkCollectiveWin", () => {
     expect(checkCollectiveWin(players, 1, 7, t5)).toBeNull();
   });
 
-  it("Brás Cubas não infla o contador de moradores no limiar", () => {
+  it("Brás Cubas conta como morador no placar — empate em mesa 5 não encerra", () => {
     const players = {
       w: snap("w", "lobisomem"),
-      b: snap("b", "bras_cubas", { alignment: "moradores" }),
+      b: snap("b", "bras_cubas"),
+    };
+    expect(checkCollectiveWin(players, 1, 7, t5)).toBeNull();
+  });
+
+  it("Brás Cubas conta como morador — criatura ganha quando tem maioria mesmo com Brás vivo (mesa 5)", () => {
+    const players = {
+      w: snap("w", "lobisomem"),
+      s: snap("s", "saci"),
+      b: snap("b", "bras_cubas"),
     };
     expect(checkCollectiveWin(players, 1, 7, t5)).toBe("criaturas");
   });

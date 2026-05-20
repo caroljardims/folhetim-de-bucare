@@ -150,7 +150,6 @@ export function NightScreen({
       myRole === "cartomante" ||
       myRole === "boitata");
   const hideNightTarget = delegadoPass || nightRolePass;
-  const needsJailReason = myRole === "delegado" && !delegadoPass;
   let canSubmit = false;
   if (!anyPending) {
     if (delegadoPass || nightRolePass) canSubmit = true;

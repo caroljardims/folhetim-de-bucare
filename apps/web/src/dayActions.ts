@@ -31,7 +31,7 @@ export function hasPendingSaciGorro(room: DayRoomFlags | undefined): boolean {
 /** Coronel pode usar acusação formal uma vez (enquanto `actionUsed` for false). */
 export function canShowCoronelAccuse(
   myRole: string | null,
-  room: DayRoomFlags,
+  _room: DayRoomFlags,
   me: DayPlayerFlags | undefined,
 ): boolean {
   return myRole === "coronel" && isDayParticipant(me) && !me?.actionUsed;

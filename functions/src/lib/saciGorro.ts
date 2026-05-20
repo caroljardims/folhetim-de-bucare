@@ -128,13 +128,18 @@ async function processGorroExpulsion(
   saciId: string,
   players: LoadedPlayer[],
   secrets: SecretsMap,
-): Promise<void> {
+): Promise<boolean> {
   const roomRef = db.collection("rooms").doc(roomCode);
   const target = players.find((p) => p.id === targetPlayerId)!;
   const role = secrets[targetPlayerId]!.role;
+  const isBotBras = role === "bras_cubas" && Boolean(target.isBot);
 
   const batch = db.batch();
-  batch.update(roomRef.collection("players").doc(targetPlayerId), { alive: false, expelled: true });
+  batch.update(roomRef.collection("players").doc(targetPlayerId), {
+    alive: false,
+    expelled: true,
+    ...(isBotBras ? { individualObjectiveMet: true } : {}),
+  });
 
   const msg =
     role === "bras_cubas"
@@ -149,26 +154,51 @@ async function processGorroExpulsion(
     createdAt: FieldValue.serverTimestamp(),
   });
 
-  const roomBatchUpdate: Record<string, unknown> = {
-    votingOpen: false,
-    ...(role === "bras_cubas" ? { pendingBrasChoice: true } : {}),
-  };
-
-  if (role === "padre") {
-    const mulaPlayer = players.find((p) => secrets[p.id]?.role === "mula");
-    if (mulaPlayer && !mulaPlayer.individualObjectiveMet) {
-      batch.update(roomRef.collection("players").doc(mulaPlayer.id), { individualObjectiveMet: true });
-      roomBatchUpdate.individualWins = FieldValue.arrayUnion({
-        playerId: mulaPlayer.id,
-        role: "mula",
-        type: "mula_padre",
+  if (isBotBras) {
+    const revealedRoles: Record<string, string> = {};
+    for (const p of players) {
+      const r = secrets[p.id]?.role;
+      if (r) revealedRoles[p.id] = r;
+    }
+    batch.update(roomRef, {
+      votingOpen: false,
+      status: "ended",
+      phase: "ended",
+      winner: targetPlayerId,
+      pendingBrasChoice: false,
+      pendingSaciGorro: FieldValue.delete(),
+      revealedRoles,
+      individualWins: FieldValue.arrayUnion({
+        playerId: targetPlayerId,
+        role: "bras_cubas",
+        type: "bras_tolo_encerra",
         round,
         timestamp: Date.now(),
-      });
+      }),
+    });
+  } else {
+    const roomBatchUpdate: Record<string, unknown> = {
+      votingOpen: false,
+      ...(role === "bras_cubas" ? { pendingBrasChoice: true } : {}),
+    };
+
+    if (role === "padre") {
+      const mulaPlayer = players.find((p) => secrets[p.id]?.role === "mula");
+      if (mulaPlayer && !mulaPlayer.individualObjectiveMet) {
+        batch.update(roomRef.collection("players").doc(mulaPlayer.id), { individualObjectiveMet: true });
+        roomBatchUpdate.individualWins = FieldValue.arrayUnion({
+          playerId: mulaPlayer.id,
+          role: "mula",
+          type: "mula_padre",
+          round,
+          timestamp: Date.now(),
+        });
+      }
     }
+
+    batch.update(roomRef, roomBatchUpdate);
   }
 
-  batch.update(roomRef, roomBatchUpdate);
   await batch.commit();
 
   await appendPrivateLog(
@@ -177,12 +207,16 @@ async function processGorroExpulsion(
     round,
     `O redemoinho fez seu trabalho. ${target.name} foi no seu lugar. Ninguém vai saber.`,
   );
-  await appendPrivateLog(
-    roomRef,
-    targetPlayerId,
-    round,
-    "Você foi expulso por um redemoinho — não pela cidade. O Saci Pererê trocou de lugar com você no momento da expulsão. Só você sabe disso agora.",
-  );
+  if (!isBotBras) {
+    await appendPrivateLog(
+      roomRef,
+      targetPlayerId,
+      round,
+      "Você foi expulso por um redemoinho — não pela cidade. O Saci Pererê trocou de lugar com você no momento da expulsão. Só você sabe disso agora.",
+    );
+  }
+
+  return isBotBras;
 }
 
 async function enqueueExpireTask(roomCode: string, round: number): Promise<void> {
@@ -274,7 +308,13 @@ export async function completeGorroSwap(roomCode: string, targetPlayerId: string
 
   if (!claimed) return false;
 
-  await processGorroExpulsion(roomCode, round, targetPlayerId, saciId, players, secrets);
+  const isBotBrasExpelled = await processGorroExpulsion(roomCode, round, targetPlayerId, saciId, players, secrets);
+
+  if (isBotBrasExpelled) {
+    await grantObjectiveMvp(roomCode, targetPlayerId, round).catch(console.error);
+    await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
+    return true;
+  }
 
   const voteSnap = await roomRef.collection("votes").doc(String(round)).get();
   const votesRaw = voteSnap.data() ?? {};

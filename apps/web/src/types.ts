@@ -16,7 +16,6 @@ export type View = "intro" | "create" | "join" | "joinName";
 export type RoomDoc = DocumentData & {
   status?: string;
   hostUid?: string;
-  expectedPlayerCount?: number;
   round?: number;
   /** Teto de rodadas antes da vitória automática do folclore (lua cheia). */
   maxRounds?: number;

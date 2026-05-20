@@ -159,7 +159,6 @@ export const startDebugGame = onCall(async (req) => {
     code,
     hostUid: uid,
     memberUids: [uid],
-    expectedPlayerCount: totalPlayers,
     status: "night",
     round: startRound,
     phase: "night",

@@ -1,8 +1,4 @@
-import {
-  geniConversedPlayerIds,
-  normalizeGeniInvestigatedTargets,
-  type RoleId,
-} from "folclore-game-engine";
+import { type RoleId } from "folclore-game-engine";
 import {
   lazy,
   Suspense,
@@ -36,7 +32,7 @@ import { isLocalDebug } from "./debug/isLocalDebug.js";
 import { DEBUG_ROLE_LABELS } from "./debug/roleOptions.js";
 import { NIGHT_ROLE_ACTION_SECONDS } from "./lib/nightTurnConstants.js";
 import { mapCallableError } from "./lib/callableErrors.js";
-import type { PlayerDoc, RoomDoc, View } from "./types.js";
+import type { PlayerDoc, View } from "./types.js";
 import { BtnSpinner } from "./components/BtnSpinner.js";
 import { EndScreen } from "./components/screens/EndScreen.js";
 import { AmanhecerScreen } from "./components/screens/AmanhecerScreen.js";
@@ -66,24 +62,6 @@ const LS_ROOM = "folclore_roomCode";
 const LS_PLAYER = "folclore_playerId";
 const LS_GLYPH = "folclore_glyph";
 
-/** @deprecated – kept only during refactor; use RoleLoreContent directly */
-function extractBatismoSections(lore: unknown): { quem: string; faz: string; quer: string } {
-  if (!lore || typeof lore === "string") {
-    return { quem: typeof lore === "string" ? lore : "", faz: "", quer: "" };
-  }
-  const rich = lore as { narrative?: string; sections?: Array<{ kind: string; title?: string; content?: unknown; text?: unknown }> };
-  const narrative = rich.narrative ?? "";
-  const sections = rich.sections ?? [];
-  const faz = sections.find(
-    (s) => s.kind === "kv" && /poder|noturno|poder noturno|habilidade/i.test(String(s.title ?? "")),
-  );
-  const quer = sections.find(
-    (s) => s.kind === "kv" && /objetivo/i.test(String(s.title ?? "")),
-  );
-  const fazText = faz ? String(typeof faz.content === "string" ? faz.content : "") : "";
-  const querText = quer ? String(typeof quer.content === "string" ? quer.content : "") : "";
-  return { quem: narrative, faz: fazText, quer: querText };
-}
 
 const DebugIntroChromeLazy = lazy(() => import("./debug/DebugIntroChrome.js"));
 const DebugGameChromeLazy = lazy(() => import("./debug/DebugGameChrome.js"));
