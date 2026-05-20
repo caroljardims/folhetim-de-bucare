@@ -28,7 +28,6 @@ Sistema de party game remoto baseado em turnos. Jogadores acessam via browser no
   maxRounds: number,             // lua cheia — definido pela composição
   hostUid: string,               // Firebase Auth uid do anfitrião
   spokespersonId: string,        // playerId do porta-voz
-  expectedPlayerCount: number,   // vagas planejadas (lobby)
   nightPhaseIndex: number,       // índice na fila de papéis ativos da noite (0-based)
   currentActorRole: string | null, // papel cuja ação está pendente, ou null
   nightOrderRoles: RoleId[],     // ordem completa de papéis da noite (calculada no início)
@@ -39,6 +38,7 @@ Sistema de party game remoto baseado em turnos. Jogadores acessam via browser no
   saciActedLastNight: boolean,   // Saci agiu na noite anterior (voto em Brás conta em dobro no dia); derivado em finalizeNight() a partir de nightActions
   geniInvestigatedTargets: Array<{ playerId: string, round: number, result: 'criatura' | 'morador' }>, // conversas da Geni (acumulado). Legado em salas antigas: string[] (playerId só). No amanhecer, consulta do Cangaceiro e Romance da Caatinga só consideram entradas com round < rodada atual; Tiro Certo (dia) usa round <= rodada do dia.
   pendingBrasChoice: boolean,    // Brás Cubas foi expulso e precisa escolher
+  brasAvailableRoles: string[],  // papéis disponíveis para Brás continuar (sem duplicar mesa); calculado em finalizeDay/saciGorro
   pendingSaciGorro: {            // Saci venceu a votação de expulsão e ainda não escolheu substituto
     saciPlayerId: string,
     expiresAt: timestamp,        // now + 60s
@@ -125,8 +125,9 @@ Em implementações Firestore, preferir **subcoleções** para `publicLog` / `pr
 [
   {
     round: number,
-    type: 'death' | 'bite' | 'terror' | 'expulsion' | 'invocation' | 'dawn' | 'special',
+    type: 'death' | 'bite' | 'terror' | 'expulsion' | 'invocation' | 'dawn' | 'special' | 'chronicle_end',
     message: string,             // texto que o porta-voz lê
+    roleName?: string,           // nome de exibição do papel expulso (só em entradas type: 'expulsion')
     timestamp: timestamp
   }
 ]
@@ -178,8 +179,8 @@ Em implementações Firestore, preferir **subcoleções** para `publicLog` / `pr
 - Anfitrião cria sala e recebe código de 4-6 caracteres
 - Jogadores entram digitando o código e um nome de exibição
 - Anfitrião vê lista de jogadores conectados em tempo real
-- Anfitrião define número de jogadores esperados antes de iniciar
-- Sistema valida mínimo de 5 jogadores para iniciar
+- Anfitrião pode adicionar bots diretamente pelo painel (limite: 20 jogadores totais, humanos + bots)
+- Sistema valida mínimo de 5 participantes (humanos + bots) para iniciar
 - Ao iniciar: sistema sorteia personagens respeitando o pool correto para o número de jogadores e as regras de dependência entre pares
 
 ### Regras de sorteio
@@ -204,7 +205,7 @@ Em implementações Firestore, preferir **subcoleções** para `publicLog` / `pr
 - **Geni ↔ Boto:** se um estiver, o outro entra.
 - **Cangaceiro ↔ Iara:** se um estiver, o outro entra.
 
-**Vitória coletiva — neutros Curupira e Boitatá:** na primeira noite escolhem alinhamento `moradores` ou `criaturas` e **vencem com o lado escolhido** (contam nesse lado no limiar criaturas vs moradores). **Brás Cubas** não escolhe alinhamento; vitória dele é a regra própria do Tolo.
+**Vitória coletiva — neutros Curupira e Boitatá:** na primeira noite escolhem alinhamento `moradores` ou `criaturas` e **vencem com o lado escolhido** (contam nesse lado no limiar criaturas vs moradores). **Brás Cubas** não escolhe alinhamento; vitória dele é a regra própria do Tolo. **No tally de criaturas vs moradores, Brás Cubas conta como morador** (não como criatura nem como neutro).
 
 **Objetivos que citam “todos os moradores”** (ex.: Boto, Padre): contam apenas jogadores com `side` **morador** no segredo (não incluem neutros, mesmo alinhados).
 
@@ -569,15 +570,17 @@ Vitória por lua cheia: após um amanhecer, se `round > maxRounds` na verificaç
 ### Cloud Functions (`functions/src/`)
 
 
-| Arquivo           | Responsabilidade                                                                                                  |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `index.ts`        | Re-exporta `onCall` de `handlers/` e `setGlobalOptions`                                                           |
-| `lib/db.ts`       | Inicialização Admin + `db`                                                                                        |
-| `helpers.ts`      | `loadPlayers`, `loadSecrets`, `startNightSequence`, `nightRolesInPlay`, `randomCode`, `randomId`, `ROLE_SIDE`     |
-| `lib/finalize.ts` | `maybeFinalizeNight`, `finalizeNight`, `finalizeDay`                                                              |
-| `lib/bots.ts`     | `processBotNightActions` (chamadores devem chamar `maybeFinalizeNight` depois)                                    |
-| `handlers/*.ts`   | Callables por domínio (`game`, `night`, `day`, `dayActions`, `saciGorro`) + `handlers/shared.ts` (`requireAuth`, `findPlayer`) |
-| `lib/saciGorro.ts` | Gorro Vermelho: intercept em `finalizeDay`, `completeGorroSwap`, `expireSaciGorroIfPending` |
+| Arquivo              | Responsabilidade                                                                                                  |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `index.ts`           | Re-exporta `onCall` de `handlers/` e `setGlobalOptions`                                                          |
+| `lib/db.ts`          | Inicialização Admin + `db`                                                                                        |
+| `helpers.ts`         | `loadPlayers`, `loadSecrets`, `startNightSequence`, `nightRolesInPlay`, `randomCode`, `randomId`, `ROLE_SIDE`    |
+| `lib/finalize.ts`    | `maybeFinalizeNight`, `finalizeNight`, `finalizeDay`, `tryEndGameCollective`                                     |
+| `lib/bots.ts`        | `processBotNightActions` (chamadores devem chamar `maybeFinalizeNight` depois)                                   |
+| `lib/brasExpulsion.ts` | `brasExpulsionTeaseMessage`, `brasToloRevealEndMessage`, `computeBrasAvailableRoles`                           |
+| `lib/apocalypseRobot.ts` | `endGameApocalypseIfNoHumans`                                                                                |
+| `handlers/*.ts`      | Callables por domínio (`game`, `night`, `day`, `dayActions`, `saciGorro`) + `handlers/shared.ts` (`requireAuth`, `findPlayer`) |
+| `lib/saciGorro.ts`   | Gorro Vermelho: intercept em `finalizeDay`, `completeGorroSwap`, `expireSaciGorroIfPending`; `runPostExpulsionTail` |
 
 
 **Funções principais:**
@@ -591,6 +594,7 @@ Vitória por lua cheia: após um amanhecer, se `round > maxRounds` na verificaç
 - `finalizeDay` — tally de votos; se Saci vence expulsão e `!actionUsed` → `beginSaciGorroOffer` (pausa); senão processa expulsão; ao fim chama `runPostExpulsionTail` ou `pendingNightStart`
 - `submitSaciGorroChoice` / `expireSaciGorro` — Saci escolhe substituto ou tempo esgota (sorteio); `expireSaciGorroTask` (Cloud Task +60s)
 - `startNight` — (host only) lê `pendingNightRound`, limpa `pendingNightStart`, chama `startNightSequence`
+- `advanceDay` — (host only) callable de escape hatch: se `votingOpen: true`, chama `finalizeDay`; se dia preso (`votingOpen: false` sem `pendingNightStart/brasChoice/saciGorro`), tenta win check e define `pendingNightStart`
 - `restartGame` — (host only, status `"ended"`) deleta subcoleções via `db.recursiveDelete()`, reseta jogadores e sala para lobby
 - `processBotNightActions` — bots escolhem alvos aleatórios e submetem ações noturnas
 - `findPlayer(players, req)` — helper em `handlers/shared.ts`: busca por `playerId` (localStorage) antes de `uid`
@@ -603,6 +607,14 @@ Vitória por lua cheia: após um amanhecer, se `round > maxRounds` na verificaç
 - Após confirmar ação, volta à tela de espera
 - Jogadores sem ação noturna (aldeão, coronel, brás_cubas) veem botão **"Toque da alvorada"** — clicam para confirmar que estão prontos (`markNightReady`)
 - O amanhecer só é processado quando todos os pendentes agiram **e** todos os vivos confirmaram (`nightReadyPlayerIds`)
+
+**Transição dia → noite (AnoitecerScreen):**
+
+- A partir da rodada 2, ao entrar em `status: "night"`, todos veem a `AnoitecerScreen` antes da fase da noite
+- Exibe `FolhetimEdition` com artigo jornalístico sobre o resultado da votação do dia anterior (5 templates: unânime, placar amplo ≥3, margem estreita =1, empate exato N×N, votos nulos) + até 3 citações aleatórias do chat do dia
+- Inclui identidade (`roleName`) do expulso quando houver expulsão
+- Botão "Entrar na noite →" aparece após 1,8s; dispensar avança para a noite
+- Chat salvo continuamente durante o dia (`savedDayChat`) e votos da rodada anterior carregados via `usePrevDayVotes`
 
 **Transição noite → dia:**
 
@@ -683,6 +695,12 @@ Prioridade imediata: os problemas 1–4 podem acontecer em produção hoje com j
 - ✓ findPlayer — lookup por `playerId` (localStorage) antes de uid, evitando quebra quando Firebase renova uid de auth anônima
 - ✓ Flags de status por rodada — `dawnResolver` reseta `seduced`, `jailed`, `enchanted`, `blockedNextNight`, `invoked`, `silenced`, `silencedRounds` a cada amanhecer (antes eram acumulados permanentemente)
 - ✓ Log privado ao alvo — `dawnTargetExperience` + `resolveDawn`: fila alvos → atores → Folhetim público; textos atmosféricos sem nomear causador (exceção Romance nomeia Geni); ao abrir o dia, `finalizeNight` envia aviso extra para quem acabou de ficar `enchanted` / `seduced`
+- ✓ Criação de sala sem `expectedPlayerCount` — anfitrião adiciona bots pelo painel (máximo 20 total); limite mínimo de 5 para iniciar
+- ✓ Bot Brás Cubas encerra o jogo atomicamente — quando bot Brás é expulso, `finalizeDay` e `saciGorro.completeGorroSwap` escrevem `status: "ended"` no mesmo batch, sem `pendingBrasChoice: true` intermediário
+- ✓ Brás Cubas conta como morador no tally — `countsAsMoradorForMajority` retorna `true` para `bras_cubas` em `winConditions.ts`
+- ✓ `advanceDay` (escape hatch) — callable de resgate para dia preso; botão "Toque de recolher" visível no `DayScreen` mesmo com `votingOpen: false`
+- ✓ AnoitecerScreen — tela de transição dia→noite com `FolhetimEdition` e artigo jornalístico sobre o resultado da votação (5 templates de detecção + citações do chat do dia)
+- ✓ `roleName` no log de expulsão — `displayRoleName(role)` gravado em `publicLogEntries` nas expulsões (`finalize.ts`, `saciGorro.ts`); usado na AnoitecerScreen para revelar identidade no artigo
 - **Componente colapsável com a história do Personagem:** Em todas as telas o player pode ver a história do seu personagem para lembrar seu papel no role play. Isso pode ficar num componente colapsável no topo da tela pra não ocupar espaço o tempo todo. na primeira noite, ele aparece aberto.
 - **Crônica da partida:** pode ficar grande, aumentar a altura para caber mais texto. Pode ter a mesma fonte do folhetim no título e textos.
 - **Refatoração dos arquivos grandes:** Projeto não tem arquitetura. Propor modelo escalável para refatoração. Não executar imediatamente.
