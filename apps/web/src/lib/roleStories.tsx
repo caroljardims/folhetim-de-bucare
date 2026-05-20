@@ -20,13 +20,25 @@ export const ROLE_DISPLAY: Record<string, string> = {
   aldeao: "👨‍🌾 Aldeão",
 };
 
-/** Xilogravuras para etiqueta / batismo (criaturas com arte). */
-export const ROLE_XILO: Record<string, string> = {
+/** Placeholder (aldeão) enquanto não houver xilo do personagem. */
+const XILO_PLACEHOLDER = "/assets/xilo-aldeao.png";
+
+/** Xilogravuras com arte própria; demais papéis usam o placeholder. */
+const XILO_ART: Record<string, string> = {
   lobisomem: "/assets/xilo-lobisomem.png",
   saci: "/assets/xilo-saci.png",
   mula: "/assets/xilo-mula.png",
+  boto: "/assets/xilo-boto.png",
   iara: "/assets/xilo-iara.png",
+  curupira: "/assets/xilo-curupira.png",
+  boitata: "/assets/xilo-boitata.png",
+  aldeao: "/assets/xilo-aldeao.png",
 };
+
+/** Xilogravuras para etiqueta / batismo / carta do personagem. */
+export const ROLE_XILO: Record<string, string> = Object.fromEntries(
+  Object.keys(ROLE_DISPLAY).map((roleId) => [roleId, XILO_ART[roleId] ?? XILO_PLACEHOLDER]),
+);
 
 export const ROLE_LORE: Record<string, string | LoreRich> = {
   lobisomem: {
