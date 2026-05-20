@@ -40,6 +40,7 @@ export type DayScreenProps = {
   setLoreOpen: (v: boolean) => void;
   loreSheetFolhetoOpen: boolean;
   setLoreSheetFolhetoOpen: (v: boolean) => void;
+  selfGlyph: string;
   formatPlayerName: (p: PlayerDoc) => string;
   run: (
     fnName: string,
@@ -156,6 +157,7 @@ export function DayScreen({
   setLoreOpen,
   loreSheetFolhetoOpen,
   setLoreSheetFolhetoOpen,
+  selfGlyph,
   formatPlayerName,
   run,
   busy,
@@ -653,7 +655,7 @@ export function DayScreen({
               <VoteTargetRow
                 key={p.id}
                 player={p}
-                glyph={stablePlayerGlyph(p.id ?? "", p.name ?? "")}
+                glyph={stablePlayerGlyph(p.id ?? "", playerId, selfGlyph)}
                 selected={resolvedVoteTarget === (p.id ?? "")}
                 disabled={hasVoted || anyPending}
                 onSelect={() => pickVote(p.id ?? "")}

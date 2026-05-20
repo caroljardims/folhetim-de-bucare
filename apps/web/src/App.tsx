@@ -98,7 +98,7 @@ export function App() {
   const [roomCode, setRoomCode] = useState(() => localStorage.getItem(LS_ROOM) ?? "");
   const [playerId, setPlayerId] = useState(() => localStorage.getItem(LS_PLAYER) ?? "");
   const [name, setName] = useState("");
-  const [expected, setExpected] = useState(5);
+  const [botsToAdd, setBotsToAdd] = useState(1);
   const room = useRoomDocument(roomCode);
   const players = usePlayersCollection(roomCode);
   const secretsEnabled = Boolean(isLocalDebug() && roomCode && room?.debug === true);
@@ -287,12 +287,6 @@ export function App() {
     setVoteTarget("");
   }, [roomCode, room?.votesRound, room?.round, room?.status]);
 
-  // Sync local stepper with Firestore whenever the room doc changes
-  useEffect(() => {
-    if (room?.expectedPlayerCount) {
-      setExpected(Number(room.expectedPlayerCount));
-    }
-  }, [room?.expectedPlayerCount]);
 
   // Auto-advance join view when all 4 cells filled
   useEffect(() => {
@@ -395,29 +389,22 @@ export function App() {
     setErr(null);
     setPendingAction("fillBots");
     try {
-      if (Number(room?.expectedPlayerCount) !== expected) {
-        await call("setExpectedPlayerCount")({
-          playerId,
-          roomCode,
-          expectedPlayerCount: expected,
-        });
-      }
       await call("addBots")({
         playerId,
         roomCode,
-        count: Math.max(1, Math.min(expected, 10) - players.length),
+        count: botsToAdd,
       });
     } catch (e: unknown) {
       setErr(mapCallableError(e));
     } finally {
       setPendingAction(null);
     }
-  }, [playerId, roomCode, room?.expectedPlayerCount, expected, players.length]);
+  }, [playerId, roomCode, botsToAdd]);
 
   const createRoom = async () => {
     localStorage.setItem(LS_GLYPH, glyph);
     try {
-      const r = await run("createRoom", { name, expectedPlayerCount: expected }, "createRoom");
+      const r = await run("createRoom", { name }, "createRoom");
       setAmHost(true);
       const code = String(r.roomCode ?? "");
       const pid = String(r.playerId ?? "");
@@ -658,20 +645,21 @@ export function App() {
     </div>
   );
 
-  const stepper = (
+  const maxBotsAllowed = Math.max(0, 20 - players.length);
+  const botStepper = (
     <div className="stepper">
       <button
         type="button"
         className="stepper-btn"
-        onClick={() => setExpected(Math.max(5, expected - 1))}
+        onClick={() => setBotsToAdd(Math.max(1, botsToAdd - 1))}
       >
         −
       </button>
-      <span className="stepper-val">{expected}</span>
+      <span className="stepper-val">{botsToAdd}</span>
       <button
         type="button"
         className="stepper-btn"
-        onClick={() => setExpected(Math.min(20, expected + 1))}
+        onClick={() => setBotsToAdd(Math.min(maxBotsAllowed, botsToAdd + 1))}
       >
         +
       </button>
@@ -927,8 +915,6 @@ export function App() {
               />
               <label className="field-label">símbolo</label>
               {glyphPicker}
-              <label className="field-label">jogadores esperados</label>
-              {stepper}
               {err && <p className="error">{err}</p>}
               <button
                 type="button"
@@ -1080,7 +1066,7 @@ export function App() {
   // amHost is set locally the moment createRoom returns, before room doc arrives.
   const effectiveIsHost = isHost || (amHost && !room);
 
-  const canStart = effectiveIsHost && players.length >= 5 && players.length >= expected;
+  const canStart = effectiveIsHost && players.length >= 5;
 
   const hostCta = effectiveIsHost ? (
     <button
@@ -1101,9 +1087,7 @@ export function App() {
         <span className="btn-sub">
           {canStart
             ? `${players.length} jogadores prontos`
-            : players.length < 5
-              ? `mínimo 5 · agora ${players.length}`
-              : `${players.length} de ${room?.expectedPlayerCount ?? 5} — preencha as vagas`}
+            : `mínimo 5 · agora ${players.length}`}
         </span>
       </div>
       <span className="btn-arrow" aria-hidden>
@@ -1238,7 +1222,7 @@ export function App() {
               <div className="section-eyebrow">
                 à volta da fogueira{" "}
                 <span className="muted-label">
-                  · {players.length} de {room?.expectedPlayerCount ?? "?"}
+                  · {players.length} / 20
                 </span>
               </div>
 
@@ -1279,7 +1263,7 @@ export function App() {
                     </div>
                   </div>
                 ))}
-                {room && players.length < (room.expectedPlayerCount ?? 20) && (
+                {room && players.length < 20 && (
                   <div className="player-row player-row-empty">
                     <div className="player-glyph player-glyph-empty">+</div>
                     <div className="player-text">
@@ -1294,35 +1278,19 @@ export function App() {
                 )}
               </div>
 
-              {effectiveIsHost && (
+              {effectiveIsHost && maxBotsAllowed > 0 && (
                 <div className="host-expected">
-                  <label className="field-label">vagas esperadas</label>
-                  {stepper}
+                  <label className="field-label">adicionar bots</label>
+                  {botStepper}
                   <button
                     type="button"
                     className="chip-btn chip-btn--with-spinner"
-                    disabled={anyPending || !room}
-                    onClick={() =>
-                      void run("setExpectedPlayerCount", {
-                        roomCode,
-                        expectedPlayerCount: expected,
-                      }, "setExpected").catch(() => {})
-                    }
+                    disabled={anyPending}
+                    onClick={fillBots}
                   >
-                    atualizar vagas
-                    <BtnSpinner show={busy("setExpected")} />
+                    + adicionar {botsToAdd} bot{botsToAdd !== 1 ? "s" : ""}
+                    <BtnSpinner show={busy("fillBots")} />
                   </button>
-                  {players.length < Math.min(expected, 10) && (
-                    <button
-                      type="button"
-                      className="chip-btn chip-btn--with-spinner"
-                      disabled={anyPending}
-                      onClick={fillBots}
-                    >
-                      + preencher com bots ({Math.min(expected, 10) - players.length} vagas)
-                      <BtnSpinner show={busy("fillBots")} />
-                    </button>
-                  )}
                 </div>
               )}
             </div>
@@ -1383,7 +1351,7 @@ export function App() {
                 disabled={!batismoFolhetoOpen}
                 onClick={confirmBatismo}
               >
-                {batismoFolhetoOpen ? "Entendi — ir para a noite ☾" : "Toque o folheto primeiro"}
+                {batismoFolhetoOpen ? "Ir para a noite ☾" : "Toque o folheto primeiro"}
               </button>
               {!batismoFolhetoOpen && (
                 <p className="muted" style={{ textAlign: "center", fontSize: 12 }}>
@@ -1472,6 +1440,7 @@ export function App() {
           setLoreOpen={setLoreOpen}
           loreSheetFolhetoOpen={loreSheetFolhetoOpen}
           setLoreSheetFolhetoOpen={setLoreSheetFolhetoOpen}
+          selfGlyph={glyph}
           formatPlayerName={formatDebugPlayerOpt}
           run={run}
           busy={busy}

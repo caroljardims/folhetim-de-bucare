@@ -6,7 +6,6 @@ setGlobalOptions({ region: "us-central1", maxInstances: 10, invoker: "public" })
 export {
   createRoom,
   joinRoom,
-  setExpectedPlayerCount,
   startGame,
   addBots,
   restartGame,

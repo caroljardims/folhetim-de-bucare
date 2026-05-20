@@ -18,8 +18,6 @@ import { requireAuth } from "./shared.js";
 export const createRoom = onCall(async (req) => {
   const uid = requireAuth(req);
   const name = String(req.data?.name ?? "Anfitrião").slice(0, 40);
-  const expected = Number(req.data?.expectedPlayerCount ?? 5);
-  if (expected < 5 || expected > 20) throw new HttpsError("invalid-argument", "expectedPlayerCount inválido.");
 
   let code = randomCode();
   for (let i = 0; i < 10; i++) {
@@ -32,11 +30,10 @@ export const createRoom = onCall(async (req) => {
         code,
         hostUid: uid,
         memberUids: [uid],
-        expectedPlayerCount: expected,
         status: "lobby",
         round: 0,
         phase: "lobby",
-        maxRounds: maxRoundsForPlayerCount(expected),
+        maxRounds: null,
         spokespersonId: null,
         winner: null,
         individualWins: [],
@@ -78,7 +75,7 @@ export const joinRoom = onCall(async (req) => {
   if (room.status !== "lobby") throw new HttpsError("failed-precondition", "Partida já iniciada.");
 
   const playersSnap = await roomRef.collection("players").get();
-  if (playersSnap.size >= Number(room.expectedPlayerCount ?? 99)) {
+  if (playersSnap.size >= 20) {
     throw new HttpsError("failed-precondition", "Sala cheia.");
   }
 
@@ -98,22 +95,6 @@ export const joinRoom = onCall(async (req) => {
   return { roomCode: code, playerId };
 });
 
-export const setExpectedPlayerCount = onCall(async (req) => {
-  const uid = requireAuth(req);
-  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
-  const expected = Number(req.data?.expectedPlayerCount);
-  if (!code || expected < 5 || expected > 20) throw new HttpsError("invalid-argument", "Parâmetros inválidos.");
-
-  const roomRef = db.collection("rooms").doc(code);
-  const roomSnap = await roomRef.get();
-  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
-  if (roomSnap.data()!.hostUid !== uid) throw new HttpsError("permission-denied", "Apenas o anfitrião.");
-  await roomRef.update({
-    expectedPlayerCount: expected,
-    maxRounds: maxRoundsForPlayerCount(expected),
-  });
-  return { ok: true };
-});
 
 export const startGame = onCall(async (req) => {
   const uid = requireAuth(req);
@@ -292,7 +273,7 @@ function nextUniqueBotName(usedLower: Set<string>, pool: string[]): string {
 export const addBots = onCall(async (req) => {
   const uid = requireAuth(req);
   const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
-  const count = Math.min(Math.max(Number(req.data?.count ?? 4), 1), 15);
+  const requested = Math.min(Math.max(Number(req.data?.count ?? 1), 1), 20);
   if (!code) throw new HttpsError("invalid-argument", "Código inválido.");
 
   const roomRef = db.collection("rooms").doc(code);
@@ -303,6 +284,8 @@ export const addBots = onCall(async (req) => {
   if (room.status !== "lobby") throw new HttpsError("failed-precondition", "Jogo já iniciado.");
 
   const playersSnap = await roomRef.collection("players").get();
+  const count = Math.min(requested, 20 - playersSnap.size);
+  if (count <= 0) throw new HttpsError("failed-precondition", "Sala cheia.");
   const usedLower = new Set<string>();
   for (const d of playersSnap.docs) {
     const key = String(d.data().name ?? "").trim().toLowerCase();
