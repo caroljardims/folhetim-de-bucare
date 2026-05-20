@@ -117,6 +117,8 @@ export async function runPostExpulsionTail(
     return;
   }
 
+  const { endGameApocalypseIfNoHumans } = await import("./apocalypseRobot.js");
+  if (await endGameApocalypseIfNoHumans(roomCode, round)) return;
   const { tryEndGameCollective } = await import("./finalize.js");
   if (await tryEndGameCollective(roomCode, round, room)) {
     return;

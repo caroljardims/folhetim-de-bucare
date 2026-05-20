@@ -23,6 +23,7 @@ import {
   brasToloRevealEndMessage,
   computeBrasAvailableRoles,
 } from "./brasExpulsion.js";
+import { endGameApocalypseIfNoHumans } from "./apocalypseRobot.js";
 import { beginSaciGorroOffer, runPostExpulsionTail } from "./saciGorro.js";
 import { buildBotContext, getBotSegmentsForDayOpen, normalizePhraseKey } from "./botChat/index.js";
 import { mergeBotKnowledgeFromNightResolve } from "./botKnowledge/applyFromNightResolve.js";
@@ -842,13 +843,11 @@ export async function finalizeNight(roomCode: string, round: number) {
     await voteAnnounceBatch.commit();
   }
 
-  await maybeFinalizeDayIfAllVotesIn(roomCode, round);
-
-  const aliveAfterDawn = Object.values(res.players).filter((p) => p.alive && !p.eliminated && !p.expelled);
-  const aliveHumansAfterDawn = aliveAfterDawn.filter((p) => !players.find((pl) => pl.id === p.id)?.isBot);
-  if (aliveHumansAfterDawn.length === 0) {
-    await finalizeDay(roomCode, round);
+  if (await endGameApocalypseIfNoHumans(roomCode, round)) {
+    return;
   }
+
+  await maybeFinalizeDayIfAllVotesIn(roomCode, round);
 }
 
 /** Encerra o dia automaticamente quando todos os elegíveis já constam no doc de votos. */
@@ -875,6 +874,9 @@ export async function finalizeDay(roomCode: string, round: number) {
   const roomRef = db.collection("rooms").doc(roomCode);
   const roomSnap = await roomRef.get();
   const room = roomSnap.data() ?? {};
+
+  if (await endGameApocalypseIfNoHumans(roomCode, round)) return;
+
   if (room.status !== "day" || room.votingOpen === false) return;
 
   const [players, secrets, voteSnap] = await Promise.all([
@@ -882,66 +884,6 @@ export async function finalizeDay(roomCode: string, round: number) {
     loadSecrets(roomCode),
     roomRef.collection("votes").doc(String(round)).get(),
   ]);
-
-  const aliveHumansCheck = players.filter(
-    (p) => !p.isBot && p.alive !== false && !p.eliminated && !p.expelled,
-  );
-  if (aliveHumansCheck.length === 0) {
-    const wpCheck: Record<string, WinPlayerSnapshot> = {};
-    for (const p of players) {
-      const r = secrets[p.id]?.role;
-      if (!r) continue;
-      wpCheck[p.id] = {
-        id: p.id,
-        role: r,
-        alive: p.alive !== false,
-        eliminated: Boolean(p.eliminated),
-        expelled: Boolean(p.expelled),
-        individualObjectiveMet: Boolean(p.individualObjectiveMet),
-        alignment:
-          p.alignment === "moradores" || p.alignment === "criaturas" ? p.alignment : null,
-      };
-    }
-    const maxR = Number(room.maxRounds ?? 7);
-    const tpc = Number(room.gameTablePlayerCount ?? 0) || players.length;
-    const detail = checkCollectiveWinDetailed(wpCheck, round, maxR, tpc);
-    const forcedWinner = detail.winner ?? "bots";
-    const revealedRolesCheck: Record<string, string> = {};
-    for (const p of players) {
-      const r = secrets[p.id]?.role;
-      if (r) revealedRolesCheck[p.id] = r;
-    }
-    const endBatch = db.batch();
-    endBatch.update(roomRef, {
-      status: "ended",
-      phase: "ended",
-      winner: forcedWinner,
-      votingOpen: false,
-      revealedRoles: revealedRolesCheck,
-      ...(detail.reason === "moradores_plaza_tie"
-        ? { collectiveEndKind: "moradores_plaza_tie" }
-        : { collectiveEndKind: FieldValue.delete() }),
-    });
-    const endMsg =
-      forcedWinner === "bots"
-        ? "As criaturas fugiram. Os moradores sumiram. Algo que não veio do rio, do mato ou do sertão desceu sobre Bucaré sem avisar. Não tinha gorro vermelho. Não tinha escama. Não tinha maldição. Tinha circuito. Os robôs tomaram a praça, abduzindo tudo que era carne, folclore ou mistério — e a Bucaré ficou olhando, sem saber o que fazer com raízes que nunca viram isso antes. O cordel não tem estrofe pra apocalipse robô."
-        : collectiveWinChronicleMessagePt(detail);
-    if (endMsg) {
-      endBatch.set(roomRef.collection("publicLogEntries").doc(), {
-        round,
-        type: "chronicle_end",
-        message: endMsg,
-        timestamp: Date.now(),
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    }
-    await endBatch.commit();
-    if (forcedWinner === "moradores") {
-      await grantAldeaoObjectiveIfMoradoresWon(roomCode, round, forcedWinner, players, secrets).catch(console.error);
-    }
-    await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
-    return;
-  }
 
   const voteRound = Number(room.votesRound ?? room.round ?? 1);
   if (Number(room.voidedDayExpulsionRound) === voteRound) {
@@ -1144,6 +1086,8 @@ export async function finalizeDay(roomCode: string, round: number) {
   }
 
   await batch.commit();
+
+  if (await endGameApocalypseIfNoHumans(roomCode, voteRound)) return;
 
   if (isBotBrasExpelled) {
     await grantObjectiveMvp(roomCode, tally.expelledId!, round).catch(console.error);
