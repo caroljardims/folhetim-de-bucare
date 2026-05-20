@@ -93,6 +93,6 @@ export type PlayerDoc = DocumentData & {
   delegadoLastJailedId?: string | null;
 };
 
-export type PublicLogEntry = { id: string; message?: string; round?: number; type?: string };
+export type PublicLogEntry = { id: string; message?: string; round?: number; type?: string; roleName?: string };
 export type PrivateLogEntry = { id: string; message?: string; round?: number };
 export type ChatMessage = { id: string; name?: string; text?: string; type?: string };

@@ -542,7 +542,7 @@ export function DayScreen({
           </p>
         )}
 
-        {isHost && room.votingOpen && (
+        {isHost && (room.votingOpen || (!room.votingOpen && !room.pendingNightStart && !room.pendingBrasChoice && !hasPendingSaciGorro(room))) && (
           <>
             <p className="dia-footer__host-hint">
               {allVotesIn

@@ -10,6 +10,7 @@ import {
   collectiveWinChronicleMessagePt,
   normalizeGeniInvestigatedTargets,
   isCreatureRole,
+  displayRoleName,
 } from "folclore-game-engine";
 import type { RoleId } from "folclore-game-engine";
 import { db } from "./db.js";
@@ -1070,6 +1071,7 @@ export async function finalizeDay(roomCode: string, round: number) {
       round,
       type: role === "bras_cubas" ? "special" : "expulsion",
       message: msg,
+      roleName: displayRoleName(role),
       timestamp: Date.now(),
       createdAt: FieldValue.serverTimestamp(),
     });

@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { db, loadPlayers, loadSecrets } from "../helpers.js";
-import { finalizeDay, maybeFinalizeDayIfAllVotesIn } from "../lib/finalize.js";
+import { finalizeDay, maybeFinalizeDayIfAllVotesIn, tryEndGameCollective } from "../lib/finalize.js";
 import { canBeExpulsionVoteTarget, canSubmitExpulsionVote } from "../lib/playerVote.js";
 import { findPlayer, requireAuth } from "./shared.js";
 import { buildBotContext, getBotMessage, normalizePhraseKey } from "../lib/botChat/index.js";
@@ -167,6 +167,21 @@ export const advanceDay = onCall(async (req) => {
   if (room.status !== "day") throw new HttpsError("failed-precondition", "Não é fase do dia.");
 
   const round = Number(room.votesRound ?? room.round ?? 1);
-  await finalizeDay(code, round);
+
+  if (room.votingOpen !== false) {
+    await finalizeDay(code, round);
+    return { ok: true };
+  }
+
+  // Rescue: votingOpen já foi fechado (batch rodou) mas o pós-processamento falhou —
+  // jogo preso com status "day" sem pendingNightStart nem pendingBrasChoice.
+  const isStuck =
+    !room.pendingNightStart &&
+    !room.pendingBrasChoice &&
+    !room.pendingSaciGorro;
+  if (!isStuck) return { ok: true };
+
+  if (await tryEndGameCollective(code, round, room)) return { ok: true };
+  await roomRef.update({ pendingNightStart: true, pendingNightRound: round + 1 });
   return { ok: true };
 });

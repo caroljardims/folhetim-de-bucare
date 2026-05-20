@@ -150,6 +150,7 @@ async function processGorroExpulsion(
     round,
     type: role === "bras_cubas" ? "special" : "expulsion",
     message: msg,
+    roleName: displayRoleName(role),
     timestamp: Date.now(),
     createdAt: FieldValue.serverTimestamp(),
   });

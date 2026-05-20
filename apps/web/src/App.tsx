@@ -21,6 +21,7 @@ import {
 } from "./lib/roleStories.js";
 import { useChat } from "./hooks/useChat.js";
 import { useDayVotes } from "./hooks/useDayVotes.js";
+import { usePrevDayVotes } from "./hooks/usePrevDayVotes.js";
 import { useGameEndHistory } from "./hooks/useGameEndHistory.js";
 import { useMyRole } from "./hooks/useMyRole.js";
 import { usePlayersCollection } from "./hooks/usePlayersCollection.js";
@@ -36,6 +37,7 @@ import type { PlayerDoc, View } from "./types.js";
 import { BtnSpinner } from "./components/BtnSpinner.js";
 import { EndScreen } from "./components/screens/EndScreen.js";
 import { AmanhecerScreen } from "./components/screens/AmanhecerScreen.js";
+import { AnoitecerScreen } from "./components/screens/AnoitecerScreen.js";
 import { DayScreen } from "./components/screens/DayScreen.js";
 import {
   buildRoundFolhetim,
@@ -86,6 +88,7 @@ export function App() {
   const privateLog = usePrivateLog(roomCode, playerId);
   const chat = useChat(roomCode, room?.status === "day");
   const dayRoundVotes = useDayVotes(roomCode, room);
+  const prevDayVotes = usePrevDayVotes(roomCode, room);
   const { allRoundVotes, allRoundBotVoteReasons, allNightActions, historyLoaded } = useGameEndHistory(
     roomCode,
     room,
@@ -122,6 +125,15 @@ export function App() {
   const [batismoFolhetoOpen, setBatismoFolhetoOpen] = useState(false);
 
   const [folhetimDismissedRound, setFolhetimDismissedRound] = useState(0);
+  const [anoitecerDismissedRound, setAnoitecerDismissedRound] = useState(0);
+  const [savedDayChat, setSavedDayChat] = useState<typeof chat>([]);
+
+  // Update savedDayChat whenever chat changes during the day — naturally retained during night
+  useEffect(() => {
+    if (room?.status === "day" && chat.length > 0) {
+      setSavedDayChat(chat);
+    }
+  }, [chat, room?.status]);
 
   const showBatismo =
     room?.status === "night" &&
@@ -136,6 +148,12 @@ export function App() {
     currentRound >= 1 &&
     folhetimDismissedRound !== currentRound;
 
+  const showAnoitecer =
+    room?.status === "night" &&
+    !showBatismo &&
+    currentRound > 1 &&
+    anoitecerDismissedRound !== currentRound;
+
   const roundFolhetim = useMemo(
     () => buildRoundFolhetim(publicLog, currentRound),
     [publicLog, currentRound],
@@ -144,6 +162,8 @@ export function App() {
 
   const inDayPhase =
     room?.status === "day" && !showBatismo && !showAmanhecer;
+  const inNightPhase =
+    room?.status === "night" && !showBatismo && !showAnoitecer;
   const inEndedPhase = room?.status === "ended";
 
   function confirmBatismo() {
@@ -1118,9 +1138,11 @@ export function App() {
             ? "lobby"
             : showAmanhecer
               ? `amanhecer · dia ${room?.round ?? 1}`
-              : room?.status === "night"
-                ? `rodada ${room.round ?? 1} · noite`
-                : inDayPhase
+              : showAnoitecer
+                ? `anoitecer · lua ${room?.round ?? 1}`
+                : inNightPhase
+                  ? `rodada ${room?.round ?? 1} · noite`
+                  : inDayPhase
                   ? `dia ${room?.round ?? 1} · praça`
                   : inEndedPhase
                     ? "edição final"
@@ -1132,7 +1154,7 @@ export function App() {
           <span className="dot-online" />
           {players.length}
         </span>
-        {((room?.status === "night" && myRole && !showBatismo) || inDayPhase) && myRole ? (
+        {(inNightPhase || inDayPhase) && myRole ? (
           <button
             type="button"
             className="back-link noite-help-btn"
@@ -1341,7 +1363,18 @@ export function App() {
         );
       })()}
 
-      {room && room.status === "night" && !showBatismo && (
+      {showAnoitecer && room && (
+        <AnoitecerScreen
+          room={room}
+          publicLog={publicLog}
+          savedDayChat={savedDayChat}
+          prevDayVotes={prevDayVotes}
+          players={players}
+          onDismiss={() => setAnoitecerDismissedRound(currentRound)}
+        />
+      )}
+
+      {inNightPhase && room && (
         <NightScreen
           room={room}
           roomCode={roomCode}
