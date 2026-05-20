@@ -52,7 +52,11 @@ async function applyAppleDisplayNameIfNeeded(user: User, result: UserCredential)
  */
 export async function finalizeOAuthSession(user: User, credentialResult?: UserCredential): Promise<void> {
   if (credentialResult) await applyAppleDisplayNameIfNeeded(user, credentialResult);
-  await ensureUserProfile(auth.currentUser ?? user);
+  try {
+    await ensureUserProfile(auth.currentUser ?? user);
+  } catch {
+    // Auth já vale; perfil no Firestore é best-effort (rede, regras, etc.).
+  }
 }
 
 async function linkPendingCredential(

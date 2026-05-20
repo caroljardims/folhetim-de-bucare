@@ -25,6 +25,8 @@ export type RoomDoc = DocumentData & {
   votingOpen?: boolean;
   votesRound?: number;
   pendingBrasChoice?: boolean;
+  /** Papéis livres para Brás continuar após expulsão (sem duplicar mesa). */
+  brasAvailableRoles?: string[];
   pendingNightStart?: boolean;
   pendingNightRound?: number;
   winner?: string | null;
@@ -33,6 +35,11 @@ export type RoomDoc = DocumentData & {
     saciPlayerId: string;
     expiresAt: { seconds: number; nanoseconds?: number } | number;
     round?: number;
+  } | null;
+  /** Anfitrião convocou apuração — 10s para votar antes de encerrar o dia. */
+  pendingVotingFinalize?: {
+    expiresAt: { seconds: number; nanoseconds?: number } | number;
+    round: number;
   } | null;
   coronelAccusationTarget?: string;
   /** Dia em que a expulsão por votação foi anulada após acusação formal do Coronel (`votesRound` daquele dia). */

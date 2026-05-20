@@ -18,6 +18,11 @@ import { loadPlayers, loadSecrets } from "../helpers.js";
 import { finalizeMvpLedgerIfNeeded } from "./endGameScoring.js";
 import { grantAldeaoObjectiveIfMoradoresWon, grantObjectiveMvp } from "./playerPrivateScore.js";
 import { scoreMvpAtDawn } from "./mvpDawnAndVoteScoring.js";
+import {
+  brasExpulsionTeaseMessage,
+  brasToloRevealEndMessage,
+  computeBrasAvailableRoles,
+} from "./brasExpulsion.js";
 import { beginSaciGorroOffer, runPostExpulsionTail } from "./saciGorro.js";
 import { buildBotContext, getBotSegmentsForDayOpen, normalizePhraseKey } from "./botChat/index.js";
 import { mergeBotKnowledgeFromNightResolve } from "./botKnowledge/applyFromNightResolve.js";
@@ -1063,15 +1068,17 @@ export async function finalizeDay(roomCode: string, round: number) {
       expelled: true,
       ...(isBotBras ? { individualObjectiveMet: true } : {}),
     });
-    const msg =
-      role === "bras_cubas"
-        ? `Espera. ${expelled.name} sorri. Era o Tolo — e ser expulso era exatamente o que queria.`
+    const isHumanBras = role === "bras_cubas" && !isBotBras;
+    const msg = isHumanBras
+      ? brasExpulsionTeaseMessage(String(expelled.name ?? expelled.id))
+      : role === "bras_cubas"
+        ? brasToloRevealEndMessage(String(expelled.name ?? expelled.id))
         : `A cidade votou pela expulsão de: ${expelled.name}.`;
     batch.set(roomRef.collection("publicLogEntries").doc(), {
       round,
       type: role === "bras_cubas" ? "special" : "expulsion",
       message: msg,
-      roleName: displayRoleName(role),
+      ...(!isHumanBras ? { roleName: displayRoleName(role) } : {}),
       timestamp: Date.now(),
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -1099,7 +1106,12 @@ export async function finalizeDay(roomCode: string, round: number) {
     } else {
       const roomBatchUpdate: Record<string, unknown> = {
         votingOpen: false,
-        ...(role === "bras_cubas" ? { pendingBrasChoice: true } : {}),
+        ...(role === "bras_cubas"
+          ? {
+              pendingBrasChoice: true,
+              brasAvailableRoles: computeBrasAvailableRoles(players, secrets, tally.expelledId),
+            }
+          : {}),
       };
       if (role === "padre") {
         const mulaPlayer = players.find((p) => secrets[p.id]?.role === "mula");

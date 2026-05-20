@@ -17,6 +17,12 @@ import { beginSaciGorroOffer, runPostExpulsionTail } from "../lib/saciGorro.js";
 import { finalizeMvpLedgerIfNeeded } from "../lib/endGameScoring.js";
 import { grantAldeaoObjectiveIfMoradoresWon, grantObjectiveMvp } from "../lib/playerPrivateScore.js";
 import { findPlayer, requireAuth } from "./shared.js";
+import {
+  brasExpulsionTeaseMessage,
+  brasContinueCoverMessage,
+  brasToloRevealEndMessage,
+  computeBrasAvailableRoles,
+} from "../lib/brasExpulsion.js";
 
 export const brasContinueChoice = onCall(async (req) => {
   requireAuth(req);
@@ -38,12 +44,14 @@ export const brasContinueChoice = onCall(async (req) => {
       if (r) revealedRoles[p.id] = r;
     }
     const round = Number(roomSnap.data()!.round ?? 1);
+    const brasName = String(me.name ?? me.id);
     await Promise.all([
       roomRef.update({
         status: "ended",
         phase: "ended",
         winner: me.id,
         pendingBrasChoice: false,
+        brasAvailableRoles: FieldValue.delete(),
         revealedRoles,
         individualWins: FieldValue.arrayUnion({
           playerId: me.id,
@@ -54,13 +62,28 @@ export const brasContinueChoice = onCall(async (req) => {
         }),
       }),
       roomRef.collection("players").doc(me.id).update({ individualObjectiveMet: true }),
+      roomRef.collection("publicLogEntries").add({
+        round,
+        type: "special",
+        message: brasToloRevealEndMessage(brasName),
+        roleName: displayRoleName("bras_cubas"),
+        timestamp: Date.now(),
+        createdAt: FieldValue.serverTimestamp(),
+      }),
     ]);
     await finalizeMvpLedgerIfNeeded(code).catch(console.error);
   } else {
-    const validRoles = Object.keys(ROLE_SIDE) as RoleId[];
-    const resolvedRole = (chosenRole && validRoles.includes(chosenRole as RoleId))
-      ? (chosenRole as RoleId)
-      : "aldeao";
+    const expelledRound = Number(roomSnap.data()!.round ?? 1);
+    const available =
+      (roomSnap.data()!.brasAvailableRoles as RoleId[] | undefined) ??
+      computeBrasAvailableRoles(players, secrets, me.id);
+    const validRoles = available.length > 0 ? available : (["aldeao"] as RoleId[]);
+    const resolvedRole =
+      chosenRole && validRoles.includes(chosenRole as RoleId) ? (chosenRole as RoleId) : validRoles[0]!;
+    if (chosenRole && !validRoles.includes(chosenRole as RoleId)) {
+      throw new HttpsError("failed-precondition", "Este papel já está na cidade. Escolha outro.");
+    }
+    const brasName = String(me.name ?? me.id);
     await roomRef.collection("secrets").doc(me.id).update({ role: resolvedRole, side: ROLE_SIDE[resolvedRole] });
     await roomRef.collection("players").doc(me.id).update({
       alive: true,
@@ -72,12 +95,32 @@ export const brasContinueChoice = onCall(async (req) => {
       individualObjectiveMet: false,
       actionUsed: false,
       publicReveal: FieldValue.delete(),
+      silenced: false,
+      silencedRounds: 0,
+      enchanted: false,
+      seduced: false,
+      jailed: false,
+      protected: false,
+      catechized: false,
+      invoked: false,
+      blockedNextNight: false,
     });
-    await roomRef.update({ pendingBrasChoice: false, votingOpen: false });
-    const r = Number(roomSnap.data()!.round ?? 1) + 1;
+    await roomRef.collection("publicLogEntries").add({
+      round: expelledRound,
+      type: "special",
+      message: brasContinueCoverMessage(brasName),
+      timestamp: Date.now(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await roomRef.update({
+      pendingBrasChoice: false,
+      brasAvailableRoles: FieldValue.delete(),
+      votingOpen: false,
+    });
+    const r = expelledRound + 1;
     await roomRef.collection("playerPrivate").doc(me.id).set({ bdObjective: 0 }, { merge: true });
     await startNightSequence(code, r);
-    await processBotNightActions(code, r);
+    await processBotNightActions(code, r, { deferHumanRolesForPlayerIds: [me.id] });
     await maybeFinalizeNight(code, r);
   }
   return { ok: true };
@@ -199,6 +242,7 @@ export const coronelStartAccusation = onCall(async (req) => {
   }
   if (targetRole === "bras_cubas") {
     roomUp.pendingBrasChoice = true;
+    roomUp.brasAvailableRoles = computeBrasAvailableRoles(players, secrets, targetId);
   }
   if (winsToUnion.length > 0) {
     roomUp.individualWins = FieldValue.arrayUnion(...winsToUnion);
@@ -209,7 +253,7 @@ export const coronelStartAccusation = onCall(async (req) => {
     b.set(roomRef.collection("publicLogEntries").doc(), {
       round,
       type: "special",
-      message: `Espera. ${targetName} sorri. Era o Tolo — e ser expulso era exatamente o que queria.`,
+      message: brasExpulsionTeaseMessage(targetName),
       timestamp: Date.now(),
       createdAt: FieldValue.serverTimestamp(),
     });

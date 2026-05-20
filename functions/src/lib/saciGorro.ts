@@ -10,6 +10,11 @@ import { loadPlayers, loadSecrets } from "../helpers.js";
 import { finalizeMvpLedgerIfNeeded } from "./endGameScoring.js";
 import { grantObjectiveMvp } from "./playerPrivateScore.js";
 import { scoreBrasRoundTease, scoreMvpVotesAfterDay } from "./mvpDawnAndVoteScoring.js";
+import {
+  brasExpulsionTeaseMessage,
+  brasToloRevealEndMessage,
+  computeBrasAvailableRoles,
+} from "./brasExpulsion.js";
 
 type LoadedPlayer = Awaited<ReturnType<typeof loadPlayers>>[number];
 type SecretsMap = Awaited<ReturnType<typeof loadSecrets>>;
@@ -141,16 +146,18 @@ async function processGorroExpulsion(
     ...(isBotBras ? { individualObjectiveMet: true } : {}),
   });
 
-  const msg =
-    role === "bras_cubas"
-      ? `Espera. ${target.name} sorri. Era o Tolo — e ser expulso era exatamente o que queria.`
+  const isHumanBras = role === "bras_cubas" && !isBotBras;
+  const msg = isHumanBras
+    ? brasExpulsionTeaseMessage(String(target.name ?? targetPlayerId))
+    : role === "bras_cubas"
+      ? brasToloRevealEndMessage(String(target.name ?? targetPlayerId))
       : `${target.name} é expulso(a) da cidade. Era ${displayRoleName(role)}.`;
 
   batch.set(roomRef.collection("publicLogEntries").doc(), {
     round,
     type: role === "bras_cubas" ? "special" : "expulsion",
     message: msg,
-    roleName: displayRoleName(role),
+    ...(!isHumanBras ? { roleName: displayRoleName(role) } : {}),
     timestamp: Date.now(),
     createdAt: FieldValue.serverTimestamp(),
   });
@@ -180,7 +187,12 @@ async function processGorroExpulsion(
   } else {
     const roomBatchUpdate: Record<string, unknown> = {
       votingOpen: false,
-      ...(role === "bras_cubas" ? { pendingBrasChoice: true } : {}),
+      ...(role === "bras_cubas"
+        ? {
+            pendingBrasChoice: true,
+            brasAvailableRoles: computeBrasAvailableRoles(players, secrets, targetPlayerId),
+          }
+        : {}),
     };
 
     if (role === "padre") {

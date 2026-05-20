@@ -29,7 +29,7 @@ export function FolhetimOverlay({
         <FolhetimEdition round={round} folhetim={folhetim} />
         <button
           type="button"
-          className="btn-dia folhetim-overlay__close"
+          className="btn-transicao folhetim-overlay__close"
           onClick={onClose}
         >
           ← Voltar à praça

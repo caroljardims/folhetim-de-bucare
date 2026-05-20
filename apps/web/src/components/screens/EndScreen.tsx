@@ -276,7 +276,7 @@ export function EndScreen({
           {isHost && (
             <button
               type="button"
-              className="btn-dia fim-restart-btn"
+              className="btn-transicao fim-restart-btn"
               disabled={anyPending}
               onClick={() => void run("restartGame", { roomCode }, "restartGame").catch(() => {})}
             >

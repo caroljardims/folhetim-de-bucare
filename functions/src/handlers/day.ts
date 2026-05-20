@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { db, loadPlayers, loadSecrets } from "../helpers.js";
 import { finalizeDay, maybeFinalizeDayIfAllVotesIn, tryEndGameCollective } from "../lib/finalize.js";
+import { clearPendingVotingFinalize } from "../lib/votingFinalize.js";
 import { canBeExpulsionVoteTarget, canSubmitExpulsionVote } from "../lib/playerVote.js";
 import { findPlayer, requireAuth } from "./shared.js";
 import { buildBotContext, getBotMessage, normalizePhraseKey } from "../lib/botChat/index.js";
@@ -169,6 +170,7 @@ export const advanceDay = onCall(async (req) => {
   const round = Number(room.votesRound ?? room.round ?? 1);
 
   if (room.votingOpen !== false) {
+    await clearPendingVotingFinalize(code);
     await finalizeDay(code, round);
     return { ok: true };
   }

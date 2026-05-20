@@ -22,6 +22,12 @@ export {
 export { submitVote, sendChatMessage, advanceDay } from "./handlers/day.js";
 
 export {
+  requestVotingFinalize,
+  expireVotingFinalize,
+  expireVotingFinalizeTask,
+} from "./handlers/votingFinalize.js";
+
+export {
   brasContinueChoice,
   coronelStartAccusation,
   coronelAccusationVote,

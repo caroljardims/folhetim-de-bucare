@@ -52,7 +52,7 @@ export function buildEndManchete(room: RoomDoc, players: PlayerDoc[]): EndManche
   if (room.winner === "bots") {
     return {
       manchete: "APOCALIPSE ROBÔ",
-      body: "As criaturas fugiram. Os moradores sumiram. Algo que não veio do rio, do mato ou do sertão desceu sobre Bucaré — e a praça ficou sem voz de cordel.",
+      body: "As criaturas fugiram. Os moradores sumiram. Algo que não veio do rio, do mato ou do sertão desceu sobre Bucaré sem avisar. Não tinha gorro vermelho. Não tinha escama. Não tinha maldição. Tinha circuito. Os robôs tomaram a praça, abduzindo tudo que era carne, folclore ou mistério — e a Bucaré ficou olhando, sem saber o que fazer com raízes que nunca viram isso antes. O cordel não tem estrofe pra apocalipse robô.",
     };
   }
 

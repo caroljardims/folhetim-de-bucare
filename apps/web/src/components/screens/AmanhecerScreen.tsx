@@ -89,7 +89,7 @@ export function AmanhecerScreen({
       <footer className="amanhecer-footer">
         <button
           type="button"
-          className={`btn-dia amanhecer-cta${showCta ? " amanhecer-cta--visible" : ""}`}
+          className={`btn-transicao amanhecer-cta${showCta ? " amanhecer-cta--visible" : ""}`}
           disabled={!showCta}
           onClick={onDismiss}
         >

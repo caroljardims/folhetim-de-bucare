@@ -25,8 +25,17 @@ const BOT_ROLE_ACTIONS: Partial<Record<string, string>> = {
   delegado: "jail",
 };
 
+export type ProcessBotNightActionsOptions = {
+  /** Human players who must act themselves — bots skip their role slot this round. */
+  deferHumanRolesForPlayerIds?: string[];
+};
+
 /** Runs bot night actions. Callers must invoke `maybeFinalizeNight` after this returns. */
-export async function processBotNightActions(roomCode: string, round: number): Promise<void> {
+export async function processBotNightActions(
+  roomCode: string,
+  round: number,
+  opts?: ProcessBotNightActionsOptions,
+): Promise<void> {
   const roomRef = db.collection("rooms").doc(roomCode);
   const roomSnap = await roomRef.get();
   const room = roomSnap.data() ?? {};
@@ -58,8 +67,20 @@ export async function processBotNightActions(roomCode: string, round: number): P
     usedByPlayer.set(d.id, (d.data().investigationTargetsUsed as string[]) ?? []);
   }
 
+  const deferHumanIds = new Set(opts?.deferHumanRolesForPlayerIds ?? []);
+
   for (const role of pendingRoles) {
     const actor = alive.find((p) => secrets[p.id]?.role === role);
+
+    if (
+      actor &&
+      deferHumanIds.has(actor.id) &&
+      !botIds.has(actor.id) &&
+      secrets[actor.id]?.role === role
+    ) {
+      remainingPending.push(role);
+      continue;
+    }
 
     if (!actor || !botIds.has(actor.id)) {
       remainingPending.push(role);

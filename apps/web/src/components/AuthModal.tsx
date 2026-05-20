@@ -4,8 +4,9 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ensureUserProfile } from "../auth/ensureUserProfile.js";
+import { useAuth } from "../context/AuthContext.js";
 import {
   PASSWORD_LINK_APPLE_MESSAGE,
   PASSWORD_LINK_GOOGLE_MESSAGE,
@@ -56,6 +57,7 @@ type Props = {
 };
 
 export function AuthModal({ open, onClose, onSuccess }: Props) {
+  const { user, authReady } = useAuth();
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -81,6 +83,20 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
 
   const busy = (key: string) => pending === key;
 
+  /** Popup pode ter autenticado mesmo quando o fluxo lança (ex.: perfil Firestore). */
+  const recoverIfAlreadySignedIn = useCallback((): boolean => {
+    if (!auth.currentUser) return false;
+    resetForm();
+    onSuccess();
+    return true;
+  }, [onSuccess, resetForm]);
+
+  useEffect(() => {
+    if (!open || !authReady || !user) return;
+    resetForm();
+    onSuccess();
+  }, [open, authReady, user, onSuccess, resetForm]);
+
   const onGoogle = async () => {
     setError(null);
     setPending("google");
@@ -91,7 +107,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       resetForm();
       onSuccess();
     } catch (e: unknown) {
-      setError(mapGoogleFlowError(e));
+      if (!recoverIfAlreadySignedIn()) setError(mapGoogleFlowError(e));
     } finally {
       setPending(null);
     }
@@ -107,7 +123,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       resetForm();
       onSuccess();
     } catch (e: unknown) {
-      setError(mapAppleFlowError(e));
+      if (!recoverIfAlreadySignedIn()) setError(mapAppleFlowError(e));
     } finally {
       setPending(null);
     }
@@ -121,7 +137,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       resetForm();
       onSuccess();
     } catch (e: unknown) {
-      setError(mapAuthError(e));
+      if (!recoverIfAlreadySignedIn()) setError(mapAuthError(e));
     } finally {
       setPending(null);
     }
@@ -150,13 +166,13 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       resetForm();
       onSuccess();
     } catch (e: unknown) {
-      setError(mapAuthError(e));
+      if (!recoverIfAlreadySignedIn()) setError(mapAuthError(e));
     } finally {
       setPending(null);
     }
   };
 
-  if (!open) return null;
+  if (!open || (authReady && user)) return null;
 
   return (
     <div className="auth-modal-root" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">

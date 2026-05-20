@@ -105,6 +105,13 @@ export function App() {
   const [loreOpen, setLoreOpen] = useState(false);
   const [loreSheetFolhetoOpen, setLoreSheetFolhetoOpen] = useState(false);
   const [brasChosenRole, setBrasChosenRole] = useState("aldeao");
+  const brasRoleOptions = useMemo(() => {
+    const avail = room?.brasAvailableRoles;
+    const entries = Object.entries(ROLE_DISPLAY);
+    if (!avail?.length) return entries;
+    const allowed = new Set(avail);
+    return entries.filter(([roleId]) => allowed.has(roleId));
+  }, [room?.brasAvailableRoles]);
   const [cangConsultTarget, setCangConsultTarget] = useState("");
   const [tiroCertoTarget, setTiroCertoTarget] = useState("");
   const [tiroPreview, setTiroPreview] = useState<{ consulted: boolean; hint?: string } | null>(null);
@@ -467,7 +474,7 @@ export function App() {
     setUserMenuOpen(false);
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = useCallback(() => {
     setAuthModalOpen(false);
     const t = postAuthTarget.current;
     postAuthTarget.current = null;
@@ -476,7 +483,7 @@ export function App() {
     if (hint) setName((prev) => (prev.trim() ? prev : hint));
     if (t === "create") setView("create");
     else if (t === "join") setView("join");
-  };
+  }, []);
 
   const handleLandingSignOut = async () => {
     setUserMenuOpen(false);
@@ -616,6 +623,14 @@ export function App() {
   useEffect(() => {
     if (room?.round === 1 && room?.status === "night" && !batismoSeen) setLoreOpen(true);
   }, [room?.round, room?.status, batismoSeen]);
+
+  useEffect(() => {
+    if (!room?.pendingBrasChoice) return;
+    const first = brasRoleOptions[0]?.[0];
+    if (first && !brasRoleOptions.some(([id]) => id === brasChosenRole)) {
+      setBrasChosenRole(first);
+    }
+  }, [room?.pendingBrasChoice, brasRoleOptions, brasChosenRole]);
 
   useEffect(() => {
     if (room?.status !== "night") return;
@@ -1347,11 +1362,11 @@ export function App() {
             <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
               <button
                 type="button"
-                className={`btn-dia`}
+                className="btn-transicao"
                 disabled={!batismoFolhetoOpen}
                 onClick={confirmBatismo}
               >
-                {batismoFolhetoOpen ? "Ir para a noite ☾" : "Toque o folheto primeiro"}
+                {batismoFolhetoOpen ? "Ir para a noite →" : "Toque o folheto primeiro"}
               </button>
               {!batismoFolhetoOpen && (
                 <p className="muted" style={{ textAlign: "center", fontSize: 12 }}>
@@ -1505,7 +1520,7 @@ export function App() {
               onChange={(e) => setBrasChosenRole(e.target.value)}
               className="vote-select"
             >
-              {Object.entries(ROLE_DISPLAY).map(([roleId, label]) => (
+              {brasRoleOptions.map(([roleId, label]) => (
                 <option key={roleId} value={roleId}>{label}</option>
               ))}
             </select>

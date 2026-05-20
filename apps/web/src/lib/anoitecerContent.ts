@@ -36,7 +36,27 @@ function buildArticle(
   }
   const totalVoters = Object.keys(prevDayVotes).length;
 
-  // Check for Brás Cubas special win
+  const brasContinueEntry = dayOutcomes.find(
+    (e) => e.type === "special" && String(e.message ?? "").includes("parente distante"),
+  );
+  if (brasContinueEntry) {
+    return {
+      manchete: "UM REGRESSO ESTRANHO",
+      paragraphs: [String(brasContinueEntry.message ?? "")],
+    };
+  }
+
+  const brasTeaseEntry = dayOutcomes.find(
+    (e) => e.type === "special" && String(e.message ?? "").includes("não parece abatido"),
+  );
+  if (brasTeaseEntry) {
+    return {
+      manchete: "EXPULSÃO SUSPEITA",
+      paragraphs: [String(brasTeaseEntry.message ?? "")],
+    };
+  }
+
+  // Brás revelado ao encerrar o jogo com vitória do Tolo
   const brasEntry = dayOutcomes.find(
     (e) => e.type === "special" && String(e.message ?? "").includes("Tolo"),
   );
@@ -98,7 +118,12 @@ function buildArticle(
   const expelledId = sorted[0]?.[0];
   const expelledName = expelledId ? (nameById.get(expelledId) ?? "alguém") : "alguém";
   const votesFor = expelledId ? (tally[expelledId] ?? 0) : 0;
-  const votesAgainst = totalCast - votesFor;
+  const votesOnOthers = totalCast - votesFor;
+  const voteDenom = totalVoters > 0 ? totalVoters : totalCast;
+  const voteFrac =
+    nullVotes > 0
+      ? `${votesFor} de ${voteDenom} votos (${nullVotes} em branco)`
+      : `${votesFor} de ${voteDenom} votos`;
 
   const identity = expulsionEntry?.roleName ?? null;
   const identityClause = identity
@@ -106,21 +131,21 @@ function buildArticle(
     : ".";
   const identityLine = identity ? `Era ${identity}.` : "";
 
-  const diff = votesFor - votesAgainst;
+  const margin = votesFor - votesOnOthers;
 
   let paragraph: string;
-  if (votesAgainst === 0 && votesFor > 0) {
-    // Unanimous
-    paragraph = `Unanimidade em Bucaré: ${votesFor} votos a ${votesAgainst}. ${expelledName} foi expulso(a) sem resistência da opinião pública. ${identityLine} Raramente a cidade fala com uma só voz — desta vez, falou.`;
-  } else if (diff >= 3) {
+  if (votesOnOthers === 0 && votesFor > 0) {
+    // Unanimous (todos os votos válidos no expulso)
+    paragraph = `Unanimidade em Bucaré: ${voteFrac} foram em ${expelledName}. Foi expulso(a) sem resistência da opinião pública. ${identityLine} Raramente a cidade fala com uma só voz — desta vez, falou.`;
+  } else if (margin >= 3) {
     // Landslide
-    paragraph = `Não houve dúvida desta vez. Com ${votesFor} votos contra ${votesAgainst}, Bucaré expulsou ${expelledName}. ${identityLine} A cidade segue sua noite.`;
-  } else if (diff === 1) {
+    paragraph = `Não houve dúvida desta vez. Com ${voteFrac} em ${expelledName}, Bucaré o(a) expulsou. ${identityLine} A cidade segue sua noite.`;
+  } else if (margin === 1) {
     // Narrow
-    paragraph = `Por margem estreita — ${votesFor} votos a ${votesAgainst} — Bucaré decidiu pela saída de ${expelledName}. A decisão dividiu a cidade. ${identityLine} Se a escolha foi acertada, só as próximas horas dirão.`;
+    paragraph = `Por margem estreita — ${voteFrac} em ${expelledName} — Bucaré decidiu pela saída. A decisão dividiu a cidade. ${identityLine} Se a escolha foi acertada, só as próximas horas dirão.`;
   } else {
     // Default
-    paragraph = `Por ${votesFor} votos a ${votesAgainst}, a cidade de Bucaré decidiu pela expulsão de ${expelledName}. Retirado(a) das ruas sob os olhares da comunidade${identityClause} O que Bucaré fará com essa informação é, por ora, assunto dos que ficaram.`;
+    paragraph = `Por ${voteFrac} em ${expelledName}, a cidade de Bucaré decidiu pela expulsão. Retirado(a) das ruas sob os olhares da comunidade${identityClause} O que Bucaré fará com essa informação é, por ora, assunto dos que ficaram.`;
   }
 
   return {
@@ -171,10 +196,12 @@ export function buildAnoitecerFolhetim(
     players,
   );
   const quotes = pickChatQuotes(chat, 3);
+  const dayComments =
+    quotes.length > 0 ? ["Moradores comentam eventos do dia:", ...quotes] : [];
 
   return {
     manchete,
-    paragraphs: [...articleParagraphs, ...quotes],
+    paragraphs: [...articleParagraphs, ...dayComments],
     silentNight: false,
   };
 }

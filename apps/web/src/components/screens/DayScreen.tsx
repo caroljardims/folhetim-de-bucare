@@ -9,7 +9,10 @@ import { canBeExpulsionVoteTarget, canSubmitExpulsionVote } from "../../lib/play
 import { stablePlayerGlyph } from "../../lib/playerGlyph.js";
 import { ROLE_DISPLAY, ROLE_LORE, ROLE_XILO, RoleLoreContent } from "../../lib/roleStories.js";
 import type { ChatMessage, PlayerDoc, RoomDoc } from "../../types.js";
+import { hasPendingVotingFinalize } from "../../lib/votingFinalize.js";
 import { BtnSpinner } from "../BtnSpinner.js";
+import { VotingFinalizeBanner } from "../day/VotingFinalizeBanner.js";
+import { VotingStatusPanel } from "../day/VotingStatusPanel.js";
 import { FolhetimOverlay } from "../FolhetimOverlay.js";
 
 export type DayScreenProps = {
@@ -214,6 +217,25 @@ export function DayScreen({
     !myPlayer.silenced;
 
   const votePending = canVote && room.votingOpen === true && !hasVoted;
+  const votingOpen = room.votingOpen === true;
+  const votingFinalizeActive = hasPendingVotingFinalize(room);
+  const hostMustVoteFirst = isHost && votingOpen && canVote && !hasVoted;
+  const showHostVotingControls =
+    isHost && votingOpen && !votingFinalizeActive && !hostMustVoteFirst;
+  const showHostRescueControls =
+    isHost &&
+    !votingOpen &&
+    !room.pendingNightStart &&
+    !room.pendingBrasChoice &&
+    !hasPendingSaciGorro(room);
+
+  const requestFinalizeVoting = () => {
+    const ok = window.confirm(
+      "Finalizar a votação agora? Quem ainda não votou terá 10 segundos — depois disso ficará sem voto e o dia será apurado.",
+    );
+    if (!ok) return;
+    void run("requestVotingFinalize", { roomCode }, "voteFinalizeStart").catch(() => {});
+  };
 
   const goToVote = () => {
     setDayStage(2);
@@ -272,7 +294,82 @@ export function DayScreen({
         <div className="mini-folhetim__reler">▸ reler</div>
       </button>
 
+      <div className="dia-scroll">
       <DayStages stage={dayStage} onStage={setDayStage} votePending={votePending} />
+
+      {isHost && votingOpen && (
+        <section className="dia-host-bar" aria-label="Controles do anfitrião">
+          {hostMustVoteFirst && (
+            <p className="dia-host-bar__hint">
+              Vote na aba <strong>Voto</strong> para liberar o encerramento da votação.
+            </p>
+          )}
+          {!hostMustVoteFirst && !canVote && myPlayer && (
+            <p className="dia-host-bar__hint">
+              {myPlayer.jailed
+                ? "Você está preso e não vota — pode finalizar a votação quando quiser."
+                : myPlayer.seduced
+                  ? "Você está seduzido(a) e não vota — pode finalizar a votação quando quiser."
+                  : "Você não vota nesta rodada — pode finalizar a votação quando quiser."}
+            </p>
+          )}
+          {showHostVotingControls && (
+            <>
+              <p className="dia-host-bar__status">
+                {allVotesIn
+                  ? "Todos os votos registrados."
+                  : `${votesCastCount} de ${eligibleVoters.length} votaram`}
+              </p>
+              {allVotesIn ? (
+                <button
+                  type="button"
+                  className="btn-dia dia-host-bar__btn"
+                  disabled={anyPending}
+                  onClick={() => void run("advanceDay", { roomCode }, "advanceDay").catch(() => {})}
+                >
+                  <span className="btn-with-spinner">
+                    {busy("advanceDay") ? "aguarda…" : "Apurar votos"}
+                    <BtnSpinner show={busy("advanceDay")} />
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-transicao dia-host-bar__btn"
+                  disabled={anyPending}
+                  onClick={requestFinalizeVoting}
+                >
+                  <span className="btn-with-spinner">
+                    {busy("voteFinalizeStart") ? "aguarda…" : "Finalizar votação →"}
+                    <BtnSpinner show={busy("voteFinalizeStart")} />
+                  </span>
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {votingOpen && (
+        <VotingStatusPanel
+          eligibleVoters={eligibleVoters}
+          dayRoundVotes={dayRoundVotes}
+          compact
+        />
+      )}
+
+      {votingFinalizeActive && (
+        <VotingFinalizeBanner
+          room={room}
+          onExpire={() =>
+            run(
+              "expireVotingFinalize",
+              { roomCode, round: currentRound },
+              "voteFinalizeExpire",
+            ).then(() => undefined)
+          }
+        />
+      )}
 
       <div className="dia-chat" role="log" aria-live="polite">
         {chat.length === 0 ? (
@@ -296,34 +393,6 @@ export function DayScreen({
           })
         )}
       </div>
-
-      {dayStage === 1 && canChat && (
-        <form
-          className="dia-composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!chatText.trim() || anyPending) return;
-            void run("sendChatMessage", { roomCode, text: chatText }, "chatSend")
-              .then(() => setChatText(""))
-              .catch(() => {});
-          }}
-        >
-          <input
-            value={chatText}
-            onChange={(e) => setChatText(e.target.value)}
-            placeholder="Mensagem…"
-            aria-label="Mensagem no chat"
-          />
-          <button
-            type="submit"
-            className="dia-composer__send"
-            disabled={!chatText.trim() || anyPending}
-            aria-label="Enviar"
-          >
-            {busy("chatSend") ? "…" : "▸"}
-          </button>
-        </form>
-      )}
 
       {dayStage === 1 && !canChat && myPlayer && (
         <p className="dia-status muted">
@@ -438,6 +507,9 @@ export function DayScreen({
         </div>
       )}
 
+      </div>
+
+      <div className="dia-bottom">
       <footer className="dia-footer">
         {dayStage === 1 && votePending && (
           <button
@@ -450,8 +522,12 @@ export function DayScreen({
           </button>
         )}
 
-        {dayStage === 1 && canVote && room.votingOpen === true && hasVoted && !isHost && (
-          <p className="dia-footer__voted muted">Seu voto foi enviado.</p>
+        {votingOpen && hasVoted && !isHost && (
+          <p className="dia-footer__voted muted">
+            {allVotesIn
+              ? "Seu voto foi enviado. Aguardando o anfitrião encerrar a votação."
+              : "Seu voto foi enviado."}
+          </p>
         )}
 
         {room.votingOpen === true && canVote && dayStage === 2 && (
@@ -536,32 +612,17 @@ export function DayScreen({
           </>
         )}
 
-        {dayStage === 1 && allVotesIn && !isHost && room.votingOpen && (
-          <p className="dia-footer__waiting muted">
-            Todos votaram. Aguardando o anfitrião encerrar o dia.
-          </p>
-        )}
-
-        {isHost && (room.votingOpen || (!room.votingOpen && !room.pendingNightStart && !room.pendingBrasChoice && !hasPendingSaciGorro(room))) && (
+        {showHostRescueControls && (
           <>
-            <p className="dia-footer__host-hint">
-              {allVotesIn
-                ? "Todos os votos estão registrados."
-                : `${votesCastCount} de ${eligibleVoters.length} votaram`}
-              {!canVote && !allVotesIn ? " · você não vota nesta rodada" : ""}
-            </p>
+            <p className="dia-footer__host-hint">A votação já foi encerrada — retomar o dia.</p>
             <button
               type="button"
-              className={allVotesIn ? "btn-dia dia-footer__apurar-btn" : "dia-footer__apurar"}
+              className="dia-footer__apurar"
               disabled={anyPending}
               onClick={() => void run("advanceDay", { roomCode }, "advanceDay").catch(() => {})}
             >
               <span className="btn-with-spinner">
-                {busy("advanceDay")
-                  ? "aguarda…"
-                  : allVotesIn
-                    ? "Apurar votos"
-                    : "Encerrar dia"}
+                {busy("advanceDay") ? "aguarda…" : "Encerrar dia"}
                 <BtnSpinner show={busy("advanceDay")} />
               </span>
             </button>
@@ -571,17 +632,46 @@ export function DayScreen({
         {isHost && room.pendingNightStart && !hasPendingSaciGorro(room) && !room.pendingBrasChoice && (
           <button
             type="button"
-            className="btn-dia"
+            className="btn-transicao"
             disabled={anyPending}
             onClick={() => void run("startNight", { roomCode }, "startNight").catch(() => {})}
           >
             <span className="btn-with-spinner">
-              {busy("startNight") ? "recolhendo…" : "Toque de recolher"}
+              {busy("startNight") ? "recolhendo…" : "Toque de recolher →"}
               <BtnSpinner show={busy("startNight")} />
             </span>
           </button>
         )}
       </footer>
+
+      {dayStage === 1 && canChat && (
+        <form
+          className="dia-composer"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!chatText.trim() || anyPending) return;
+            void run("sendChatMessage", { roomCode, text: chatText }, "chatSend")
+              .then(() => setChatText(""))
+              .catch(() => {});
+          }}
+        >
+          <input
+            value={chatText}
+            onChange={(e) => setChatText(e.target.value)}
+            placeholder="Mensagem…"
+            aria-label="Mensagem no chat"
+          />
+          <button
+            type="submit"
+            className="dia-composer__send"
+            disabled={!chatText.trim() || anyPending}
+            aria-label="Enviar"
+          >
+            {busy("chatSend") ? "…" : "▸"}
+          </button>
+        </form>
+      )}
+      </div>
 
       <FolhetimOverlay
         open={refolhetimOpen}

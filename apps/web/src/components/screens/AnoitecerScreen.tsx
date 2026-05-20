@@ -61,7 +61,7 @@ export function AnoitecerScreen({
       <footer className="amanhecer-footer">
         <button
           type="button"
-          className={`btn-noite amanhecer-cta${showCta ? " amanhecer-cta--visible" : ""}`}
+          className={`btn-transicao amanhecer-cta${showCta ? " amanhecer-cta--visible" : ""}`}
           disabled={!showCta}
           onClick={onDismiss}
         >
