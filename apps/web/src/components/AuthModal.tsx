@@ -1,6 +1,8 @@
 import type { AuthError } from "firebase/auth";
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  linkWithCredential,
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
@@ -54,9 +56,17 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialMode?: "signin" | "register";
+  allowAnonymousUser?: boolean;
 };
 
-export function AuthModal({ open, onClose, onSuccess }: Props) {
+export function AuthModal({
+  open,
+  onClose,
+  onSuccess,
+  initialMode = "signin",
+  allowAnonymousUser = false,
+}: Props) {
   const { user, authReady } = useAuth();
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
@@ -85,17 +95,24 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
 
   /** Popup pode ter autenticado mesmo quando o fluxo lança (ex.: perfil Firestore). */
   const recoverIfAlreadySignedIn = useCallback((): boolean => {
-    if (!auth.currentUser) return false;
+    const current = auth.currentUser;
+    if (!current || current.isAnonymous) return false;
     resetForm();
     onSuccess();
     return true;
   }, [onSuccess, resetForm]);
 
   useEffect(() => {
+    if (!open) return;
+    setMode(initialMode);
+  }, [open, initialMode]);
+
+  useEffect(() => {
     if (!open || !authReady || !user) return;
+    if (user.isAnonymous && allowAnonymousUser) return;
     resetForm();
     onSuccess();
-  }, [open, authReady, user, onSuccess, resetForm]);
+  }, [open, authReady, user, allowAnonymousUser, onSuccess, resetForm]);
 
   const onGoogle = async () => {
     setError(null);
@@ -160,9 +177,18 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
     }
     setPending("register");
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      await updateProfile(cred.user, { displayName: name.slice(0, 40) });
-      await ensureUserProfile(cred.user);
+      const trimmedEmail = email.trim();
+      const current = auth.currentUser;
+      if (current?.isAnonymous) {
+        const cred = EmailAuthProvider.credential(trimmedEmail, password);
+        await linkWithCredential(current, cred);
+        await updateProfile(current, { displayName: name.slice(0, 40) });
+        await ensureUserProfile(current);
+      } else {
+        const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        await updateProfile(cred.user, { displayName: name.slice(0, 40) });
+        await ensureUserProfile(cred.user);
+      }
       resetForm();
       onSuccess();
     } catch (e: unknown) {
@@ -172,7 +198,8 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
     }
   };
 
-  if (!open || (authReady && user)) return null;
+  const sessionBlocksModal = authReady && user && (!allowAnonymousUser || !user.isAnonymous);
+  if (!open || sessionBlocksModal) return null;
 
   return (
     <div className="auth-modal-root" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">

@@ -6,14 +6,26 @@ export function isMinhaContaPathname(pathname: string): boolean {
   return pathname === "/minha-conta";
 }
 
+export function isRankingPathname(pathname: string): boolean {
+  return pathname === "/ranking";
+}
+
+export function isProtectedAccountPath(pathname: string): boolean {
+  return isMinhaContaPathname(pathname) || isRankingPathname(pathname);
+}
+
 export function parseAccountTab(search: string): AccountTab {
   const t = new URLSearchParams(search).get("tab") ?? "";
   return TAB_SET.has(t as AccountTab) ? (t as AccountTab) : "estatisticas";
 }
 
 export function readAccountRoute(): { open: boolean; tab: AccountTab } {
+  const pathname = window.location.pathname;
+  if (isRankingPathname(pathname)) {
+    return { open: true, tab: "ranking" };
+  }
   return {
-    open: isMinhaContaPathname(window.location.pathname),
+    open: isMinhaContaPathname(pathname),
     tab: parseAccountTab(window.location.search),
   };
 }
@@ -27,12 +39,13 @@ export function migrateAccountHashToPathname(): void {
     return;
   }
   if (h === "#/ranking") {
-    window.history.replaceState(null, "", "/minha-conta?tab=ranking");
+    window.history.replaceState(null, "", "/ranking");
     window.location.hash = "";
   }
 }
 
 export function accountPathForTab(tab: AccountTab): string {
+  if (tab === "ranking") return "/ranking";
   return tab === "estatisticas" ? "/minha-conta" : `/minha-conta?tab=${tab}`;
 }
 

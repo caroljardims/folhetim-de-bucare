@@ -8,6 +8,7 @@ import {
   OAuthProvider,
   fetchSignInMethodsForEmail,
   linkWithCredential,
+  linkWithPopup,
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
@@ -115,8 +116,12 @@ async function handleAccountExistsWhileSigningIn(
 
 export async function signInWithAppleFlow(opts?: OAuthFlowOpts): Promise<void> {
   const apple = createAppleOAuthProvider();
+  const current = auth.currentUser;
   try {
-    const result = await signInWithPopup(auth, apple);
+    const result =
+      current?.isAnonymous
+        ? await linkWithPopup(current, apple)
+        : await signInWithPopup(auth, apple);
     await finalizeOAuthSession(result.user, result);
   } catch (e: unknown) {
     const err = e as AuthError;
@@ -129,8 +134,12 @@ export async function signInWithAppleFlow(opts?: OAuthFlowOpts): Promise<void> {
 }
 
 export async function signInWithGoogleFlow(opts?: OAuthFlowOpts): Promise<void> {
+  const current = auth.currentUser;
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const result =
+      current?.isAnonymous
+        ? await linkWithPopup(current, googleProvider)
+        : await signInWithPopup(auth, googleProvider);
     await finalizeOAuthSession(result.user, result);
   } catch (e: unknown) {
     const err = e as AuthError;

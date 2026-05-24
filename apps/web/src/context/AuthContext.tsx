@@ -26,7 +26,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   useEffect(() => {
     return onAuthStateChanged(auth, async (next) => {
       setUser(next);
-      if (next) {
+      if (next && !next.isAnonymous) {
         try {
           await ensureUserProfile(next);
         } catch {

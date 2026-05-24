@@ -10,9 +10,12 @@ import {
   useState,
 } from "react";
 import { AuthModal } from "./components/AuthModal.js";
+import { AuthGate } from "./components/AuthGate.js";
 import { SaciGorroModal, type PendingGorro } from "./components/SaciGorroModal.js";
 import { useAuth } from "./context/AuthContext.js";
 import { useFirebaseServices } from "./context/FirebaseServicesContext.js";
+import { ensureGuestAuth } from "./auth/ensureGuestAuth.js";
+import { requiresRealAuth } from "./auth/requiresRealAuth.js";
 import { isMasterIframeClient } from "./auth/masterPlayerFirebase.js";
 import {
   ROLE_DISPLAY,
@@ -52,7 +55,7 @@ import {
   migrateAccountHashToPathname,
   navigateAccount,
   readAccountRoute,
-  isMinhaContaPathname,
+  isProtectedAccountPath,
   type AccountTab,
 } from "./lib/accountRoute.js";
 import { useMyPlayerPrivate } from "./hooks/useMyPlayerPrivate.js";
@@ -193,6 +196,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
   const [amHost, setAmHost] = useState(false);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<"signin" | "register">("signin");
   const postAuthTarget = useRef<"create" | "join" | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
@@ -208,13 +212,8 @@ export function App({ masterBootstrap }: AppProps = {}) {
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     migrateAccountHashToPathname();
-    if (authReady && !user && isMinhaContaPathname(window.location.pathname)) {
-      window.history.replaceState(null, "", "/");
-      window.dispatchEvent(new Event("folhetim-route"));
-      setAuthModalOpen(true);
-    }
     refreshAccountRoute();
-  }, [authReady, user, refreshAccountRoute]);
+  }, [refreshAccountRoute]);
 
   useEffect(() => {
     const onRoute = () => refreshAccountRoute();
@@ -487,17 +486,56 @@ export function App({ masterBootstrap }: AppProps = {}) {
     const t = postAuthTarget.current;
     postAuthTarget.current = null;
     const u = auth.currentUser;
-    const hint = (u?.displayName ?? "").trim().slice(0, 20);
-    if (hint) setName((prev) => (prev.trim() ? prev : hint));
+    if (u && !u.isAnonymous) {
+      const hint = (u.displayName ?? "").trim().slice(0, 20);
+      if (hint) setName((prev) => (prev.trim() ? prev : hint));
+    }
     if (t === "create") setView("create");
     else if (t === "join") setView("join");
+  }, [auth]);
+
+  const openAuthModal = useCallback((mode: "signin" | "register") => {
+    setAuthModalInitialMode(mode);
+    setAuthModalOpen(true);
   }, []);
+
+  const beginGuestEntry = useCallback(
+    async (target: "create" | "join") => {
+      setErr(null);
+      setPendingAction(`guestAuth-${target}`);
+      try {
+        await ensureGuestAuth(auth);
+        if (target === "create") setView("create");
+        else setView("join");
+      } catch {
+        setErr("Não foi possível conectar. Tente novamente.");
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [auth],
+  );
+
+  const isAnonymousUser = user?.isAnonymous ?? false;
+
+  const authModalElement = (
+    <AuthModal
+      open={authModalOpen}
+      onClose={() => {
+        setAuthModalOpen(false);
+        postAuthTarget.current = null;
+      }}
+      onSuccess={handleAuthSuccess}
+      initialMode={authModalInitialMode}
+      allowAnonymousUser={isAnonymousUser}
+    />
+  );
 
   const handleLandingSignOut = async () => {
     setUserMenuOpen(false);
     try {
       await signOutUser();
-      if (typeof window !== "undefined" && isMinhaContaPathname(window.location.pathname)) {
+      if (typeof window !== "undefined" && isProtectedAccountPath(window.location.pathname)) {
         closeAccountToHome();
       }
       leave();
@@ -701,48 +739,44 @@ export function App({ masterBootstrap }: AppProps = {}) {
     );
   }
 
-  if (user && accountRoute.open) {
-    return (
-      <>
-        <MinhaContaScreen
-          user={user}
-          tab={accountRoute.tab}
-          onClose={() => closeAccountToHome()}
-          onSignOut={async () => {
-            try {
-              await signOutUser();
-              closeAccountToHome();
-              leave();
-            } catch {
-              setErr("Algo deu errado. Tente novamente.");
-            }
-          }}
-        />
-        <AuthModal
-          open={authModalOpen}
-          onClose={() => {
-            setAuthModalOpen(false);
-            postAuthTarget.current = null;
-          }}
-          onSuccess={handleAuthSuccess}
-        />
-      </>
-    );
+  if (accountRoute.open) {
+    if (requiresRealAuth(user)) {
+      return (
+        <>
+          <AuthGate
+            onCreateAccount={() => openAuthModal("register")}
+            onSignIn={() => openAuthModal("signin")}
+          />
+          {authModalElement}
+        </>
+      );
+    }
+    if (user) {
+      return (
+        <>
+          <MinhaContaScreen
+            user={user}
+            tab={accountRoute.tab}
+            onClose={() => closeAccountToHome()}
+            onSignOut={async () => {
+              try {
+                await signOutUser();
+                closeAccountToHome();
+                leave();
+              } catch {
+                setErr("Algo deu errado. Tente novamente.");
+              }
+            }}
+          />
+          {authModalElement}
+        </>
+      );
+    }
   }
 
   // ── Entry flow ──
 
   if (!roomCode) {
-    const authModal = (
-      <AuthModal
-        open={authModalOpen}
-        onClose={() => {
-          setAuthModalOpen(false);
-          postAuthTarget.current = null;
-        }}
-        onSuccess={handleAuthSuccess}
-      />
-    );
     const debugLandingChrome = isLocalDebug() ? (
       <Suspense fallback={null}>
         <DebugIntroChromeLazy
@@ -783,17 +817,19 @@ export function App({ masterBootstrap }: AppProps = {}) {
                     </button>
                     {userMenuOpen && (
                       <div className="landing-user-dropdown" role="menu">
-                        <button type="button" className="landing-user-dropdown-item" role="menuitem"
+                        <button type="button" className="landing-user-dropdown-item landing-user-dropdown-item--locked" role="menuitem"
                           onClick={() => { navigateAccount("estatisticas"); setUserMenuOpen(false); }}>
-                          Minha conta
+                          <span>Minha conta</span>
+                          {isAnonymousUser && <span className="landing-user-dropdown-lock" aria-hidden>🔒</span>}
                         </button>
                         <button type="button" className="landing-user-dropdown-item" role="menuitem"
                           onClick={() => { navigateAccount("favoritos"); setUserMenuOpen(false); }}>
                           Favoritos
                         </button>
-                        <button type="button" className="landing-user-dropdown-item" role="menuitem"
+                        <button type="button" className="landing-user-dropdown-item landing-user-dropdown-item--locked" role="menuitem"
                           onClick={() => { navigateAccount("ranking"); setUserMenuOpen(false); }}>
-                          Ranking
+                          <span>Ranking</span>
+                          {isAnonymousUser && <span className="landing-user-dropdown-lock" aria-hidden>🔒</span>}
                         </button>
                         <div className="landing-user-dropdown-divider" role="separator" />
                         <button type="button" className="landing-user-dropdown-item" role="menuitem"
@@ -827,13 +863,14 @@ export function App({ masterBootstrap }: AppProps = {}) {
                 <button
                   type="button"
                   className="primary-btn"
-                  onClick={() => {
-                    if (!user) { postAuthTarget.current = "create"; setAuthModalOpen(true); return; }
-                    setView("create");
-                  }}
+                  disabled={busy("guestAuth-create")}
+                  onClick={() => void beginGuestEntry("create")}
                 >
                   <div className="btn-stack">
-                    <span className="btn-title">Criar uma sala</span>
+                    <span className="btn-title btn-title-row">
+                      {busy("guestAuth-create") ? "conectando…" : "Criar uma sala"}
+                      <BtnSpinner show={busy("guestAuth-create")} />
+                    </span>
                     <span className="btn-sub">você vira o anfitrião da noite</span>
                   </div>
                   <span className="btn-arrow" aria-hidden>→</span>
@@ -841,14 +878,17 @@ export function App({ masterBootstrap }: AppProps = {}) {
                 <button
                   type="button"
                   className="ghost-btn"
+                  disabled={busy("guestAuth-join")}
                   onClick={() => {
                     setJoinCodeArr(["", "", "", ""]);
-                    if (!user) { postAuthTarget.current = "join"; setAuthModalOpen(true); return; }
-                    setView("join");
+                    void beginGuestEntry("join");
                   }}
                 >
                   <div className="btn-stack">
-                    <span className="btn-title">Entrar com código</span>
+                    <span className="btn-title btn-title-row">
+                      {busy("guestAuth-join") ? "conectando…" : "Entrar com código"}
+                      <BtnSpinner show={busy("guestAuth-join")} />
+                    </span>
                     <span className="btn-sub">já recebeu o convite</span>
                   </div>
                   <span className="btn-arrow" aria-hidden>→</span>
@@ -892,7 +932,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
             </footer>
           </div>
           {debugLandingChrome}
-          {authModal}
+          {authModalElement}
         </>
       );
     }
@@ -956,7 +996,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
           </div>
         </div>
         {debugLandingChrome}
-        {authModal}
+        {authModalElement}
         </>
       );
     }
@@ -1003,7 +1043,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
           </div>
         </div>
         {debugLandingChrome}
-        {authModal}
+        {authModalElement}
         </>
       );
     }
@@ -1070,7 +1110,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
           </div>
         </div>
         {debugLandingChrome}
-        {authModal}
+        {authModalElement}
         </>
       );
     }
@@ -1180,7 +1220,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
               navigateAccount("ranking");
             }}
           >
-            Ranking
+            Ranking{isAnonymousUser ? " 🔒" : ""}
           </button>
         ) : null}
       </div>
@@ -1189,6 +1229,19 @@ export function App({ masterBootstrap }: AppProps = {}) {
 
       {inLobby && (
         <>
+          {isAnonymousUser && (
+            <p className="anonymous-lobby-banner" role="status">
+              Você está jogando sem conta. Seu histórico e pontos não serão salvos.{" "}
+              <button
+                type="button"
+                className="anonymous-lobby-banner__link"
+                onClick={() => openAuthModal("register")}
+              >
+                Criar conta
+              </button>{" "}
+              para não perder nada.
+            </p>
+          )}
           <div className="lobby-content">
             <div className="code-section">
               <div className="code-card">
@@ -1556,6 +1609,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
       )}
 
     </div>
+    {authModalElement}
     </>
   );
 }
