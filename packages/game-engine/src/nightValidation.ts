@@ -1,4 +1,5 @@
 import { isBucareLocation } from "./detectiveLocations.js";
+import { isReconhecimentoSubmission } from "./reconhecimentoClues.js";
 import type { NightActionInput, PlayerDawnState } from "./types.js";
 import type { RoleId } from "./types.js";
 
@@ -6,6 +7,8 @@ export interface NightValidationContext {
   round: number;
   /** Quem está autorizado a agir neste passo. */
   expectedRole: RoleId;
+  /** Modo Detetive: story permite Noite de Reconhecimento na rodada 1. */
+  soloModeDifficulty?: "story" | "investigation";
   /** Congelado no início da partida (`gameTablePlayerCount`). Mesa de 5: Curupira/Boitatá não podem declarar criaturas. */
   tablePlayerCount?: number;
   /**
@@ -37,6 +40,15 @@ export function validateNightAction(
       return { ok: false, error: "A ronda não usa alvo de jogador." };
     }
     const loc = submission.specialAction?.trim() ?? "";
+    if (isReconhecimentoSubmission(loc)) {
+      if (ctx.round !== 1 || ctx.soloModeDifficulty !== "story") {
+        return { ok: false, error: "Noite de Reconhecimento só vale na primeira noite do Modo História." };
+      }
+      return { ok: true };
+    }
+    if (ctx.round === 1 && ctx.soloModeDifficulty === "story") {
+      return { ok: false, error: "Na primeira noite, comece a ronda por toda a cidade." };
+    }
     if (!isBucareLocation(loc)) {
       return { ok: false, error: "Local inválido." };
     }

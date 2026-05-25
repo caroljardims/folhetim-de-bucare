@@ -85,12 +85,6 @@ const LS_GLYPH = "folclore_glyph";
 
 const DebugIntroChromeLazy = lazy(() => import("./debug/DebugIntroChrome.js"));
 
-const DetectiveEndFlowLazy = lazy(() =>
-  import("./components/detective/DetectiveEndFlow.js").then((m) => ({
-    default: m.DetectiveEndFlow,
-  })),
-);
-
 const SoloDetectiveEndOrchestratorLazy = lazy(() =>
   import("./components/solo/SoloDetectiveEndOrchestrator.js").then((m) => ({
     default: m.SoloDetectiveEndOrchestrator,
@@ -231,22 +225,12 @@ export function App({ masterBootstrap }: AppProps = {}) {
   const [detectiveElimIntroDone, setDetectiveElimIntroDone] = useState(false);
 
   useEffect(() => {
-    if (!room?.soloMode || room.detectivePhase !== "accusation" || detectiveGhostObs) {
+    if (!room?.soloMode || room.detectiveEliminatedAt == null || detectiveGhostObs) {
       setDetectiveElimIntroDone(false);
       return;
     }
-    if (room.detectiveEliminatedAt == null) {
-      setDetectiveElimIntroDone(true);
-      return;
-    }
     setDetectiveElimIntroDone(sessionStorage.getItem(detectiveElimIntroKey) === "1");
-  }, [
-    room?.soloMode,
-    room?.detectivePhase,
-    room?.detectiveEliminatedAt,
-    detectiveGhostObs,
-    detectiveElimIntroKey,
-  ]);
+  }, [room?.soloMode, room?.detectiveEliminatedAt, detectiveGhostObs, detectiveElimIntroKey]);
 
   const detectiveElimIntroMsg = useMemo(() => {
     if (!room?.soloMode || room.detectiveEliminatedAt == null) return null;
@@ -258,7 +242,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
   const showDetectiveEliminatedInterstitial =
     Boolean(room?.soloMode) &&
     room?.status !== "ended" &&
-    room?.detectivePhase === "accusation" &&
+    room?.soloGamePendingEnd === true &&
     !detectiveGhostObs &&
     room?.detectiveEliminatedAt != null &&
     detectiveElimIntroMsg != null &&
@@ -266,13 +250,6 @@ export function App({ masterBootstrap }: AppProps = {}) {
 
   const showSoloDetectiveEnd =
     Boolean(room?.soloMode) && room?.status === "ended" && !showApocalypseInterstitial;
-
-  const showDetectiveEndFlowMidGame =
-    Boolean(room?.soloMode) &&
-    room?.status !== "ended" &&
-    room?.detectivePhase === "accusation" &&
-    !detectiveGhostObs &&
-    !showDetectiveEliminatedInterstitial;
 
   function confirmBatismo() {
     setBatismoSeen(true);
@@ -508,7 +485,29 @@ export function App({ masterBootstrap }: AppProps = {}) {
     if (!room.nightPendingRoles?.includes("detetive")) return;
     if (nightActionSent) return;
 
+    const isStoryReconNight =
+      room.soloModeDifficulty === "story" && Number(room.round ?? 1) === 1;
+
     const t = window.setTimeout(() => {
+      if (isStoryReconNight) {
+        void run(
+          "submitNightAction",
+          {
+            roomCode,
+            action: "visit_location",
+            targetId: null,
+            specialAction: "reconhecimento",
+          },
+          "nightAction",
+        )
+          .then(() => {
+            setNightActionSent(true);
+            setNightToast("Tempo esgotado. Você começou a ronda por Bucaré.");
+            window.setTimeout(() => setNightToast(null), 6000);
+          })
+          .catch(() => {});
+        return;
+      }
       const loc = pickRandomBucareLocation();
       void run(
         "submitNightAction",
@@ -528,6 +527,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
   }, [
     room?.status,
     room?.soloMode,
+    room?.soloModeDifficulty,
     room?.round,
     room?.nightPendingRoles,
     myRole,
@@ -1904,31 +1904,6 @@ export function App({ masterBootstrap }: AppProps = {}) {
             setDetectiveElimIntroDone(true);
           }}
         />
-      )}
-
-      {showDetectiveEndFlowMidGame && room && (
-        <Suspense fallback={null}>
-          <DetectiveEndFlowLazy
-            room={room}
-            roomCode={roomCode}
-            players={players}
-            playerId={playerId}
-            myPlayer={players.find((p) => p.id === playerId)}
-            run={run}
-            busy={busy}
-            onPlayAgain={() => {
-              leave();
-              setView("detectiveMode");
-              void beginGuestEntry("detective");
-            }}
-            onChangeMode={() => {
-              leave();
-              setView("detectiveMode");
-            }}
-            onChronicle={() => void run("completeDetectiveEndFlow", { roomCode }, "detectiveDone")}
-            isAnonymous={isAnonymousUser}
-          />
-        </Suspense>
       )}
 
       {showSoloDetectiveEnd && room && (

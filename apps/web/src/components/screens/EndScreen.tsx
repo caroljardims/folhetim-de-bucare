@@ -154,7 +154,7 @@ export function EndScreen({
         round={roundNum}
         folhetim={{
           manchete: manchete.manchete,
-          paragraphs: [manchete.body],
+          paragraphs: manchete.paragraphs,
           silentNight: false,
         }}
         lead="— a última edição —"
@@ -170,7 +170,7 @@ export function EndScreen({
 
   const cronicaSection = (
     <section
-      className="fim-page fim-page--cronica pageflip-enter"
+      className={`fim-page fim-page--cronica pageflip-enter${hideInternalNav ? " fim-page--cronica-orchestrated" : ""}`}
       aria-label={hidePodium ? "Crônica da partida" : "Crônica e pódio"}
     >
       <p className="fim-section-eyebrow">
@@ -215,7 +215,7 @@ export function EndScreen({
         </>
       )}
 
-      <article className="folhetim folhetim--edition folhetim--fim-cronica folhetim-card">
+      <article className="folhetim folhetim--edition folhetim--fim-cronica folhetim-card cronica-container">
         <header className="fim-cronica-header">
           <h2 className="fim-cronica-title">A crônica</h2>
           <span className="fim-cronica-num">N.º {String(editionNum).padStart(2, "0")}</span>

@@ -91,6 +91,15 @@
   grid-template-rows: 1fr;
 }
 
+.caderno--listening .caderno__bar {
+  animation: caderno-waiting-pulse 2s ease-in-out infinite;
+}
+
+.caderno--listening .caderno__bar-summary::after {
+  content: " · ouvindo a praça…";
+  color: var(--caderno-ink-red);
+}
+
 .caderno__body-inner {
   overflow: hidden;
 }
@@ -121,6 +130,15 @@
 .caderno-stamp--title {
   color: var(--caderno-ink-red);
   font-size: 12px;
+}
+
+.caderno-stamp--verified {
+  color: var(--caderno-ink-red);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  display: block;
+  text-align: center;
+  margin: 0 auto;
 }
 
 .caderno-stamp--blue {
@@ -649,4 +667,128 @@
 .fase--fim.page:has(.detective-end--accusation) .detective-end--accusation {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* ── Reconhecimento · Noite 1 ── */
+
+.caderno-stamp--recon {
+  color: var(--caderno-ink-red);
+  display: block;
+  margin-bottom: 10px;
+}
+
+.caderno-recon__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.caderno-recon__item {
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--caderno-line);
+}
+
+.caderno-recon__item:last-child {
+  border-bottom: none;
+}
+
+.caderno-recon__loc {
+  font-family: var(--caderno-font-type);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+  color: var(--caderno-ink);
+}
+
+.caderno-recon__clue {
+  font-family: var(--caderno-font-hand);
+  font-style: italic;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  color: var(--caderno-ink);
+}
+
+.caderno-mapa__inhabitants {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.caderno-mapa__inhabitants-label {
+  font-family: var(--caderno-font-type);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--caderno-ink-muted);
+}
+
+.caderno-mapa__inhabitants-list {
+  font-family: var(--caderno-font-hand);
+  font-size: 0.92rem;
+  color: var(--caderno-ink);
+}
+
+.caderno-mapa__role--out {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.caderno-mapa__item {
+  margin-bottom: 10px;
+}
+
+/* ── Aguardando chat do dia ── */
+
+.caderno-waiting {
+  margin: 12px 0 16px;
+  padding: 14px 12px;
+  border: 1px dashed var(--caderno-line);
+  border-radius: 4px;
+  text-align: center;
+  animation: caderno-waiting-pulse 2s ease-in-out infinite;
+}
+
+@keyframes caderno-waiting-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.caderno-waiting__pen {
+  display: inline-block;
+  font-size: 1.25rem;
+  margin-bottom: 6px;
+  animation: caderno-waiting-scribble 1.4s ease-in-out infinite;
+}
+
+@keyframes caderno-waiting-scribble {
+  0%,
+  100% {
+    transform: rotate(-6deg) translateX(0);
+  }
+  50% {
+    transform: rotate(6deg) translateX(2px);
+  }
+}
+
+.caderno-waiting__title {
+  font-family: var(--caderno-font-type);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+  color: var(--caderno-ink-red);
+}
+
+.caderno-waiting__copy {
+  font-family: var(--caderno-font-hand);
+  font-size: 1rem;
+  line-height: 1.4;
+  margin: 0;
+  color: var(--caderno-ink-muted);
 }

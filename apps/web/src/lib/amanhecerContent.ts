@@ -1,3 +1,9 @@
+import {
+  isGossipFolhetimMessage,
+  isLobisomemObjectiveR4FolhetimMessage,
+  isTieFolkloreIntactFolhetimMessage,
+  parseLobisomemObjectiveR4Folhetim,
+} from "folclore-game-engine";
 import type { PublicLogEntry } from "../types.js";
 
 export type AmanhecerFolhetim = {
@@ -45,11 +51,29 @@ function cordelDeathLine(message: string): string {
   return message;
 }
 
+function eventsToParagraphs(events: PublicLogEntry[]): string[] {
+  const out: string[] = [];
+  for (const e of events) {
+    const parsed = parseLobisomemObjectiveR4Folhetim(String(e.message ?? ""));
+    if (parsed) {
+      out.push(...parsed.paragraphs);
+      continue;
+    }
+    const p = eventToParagraph(e);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
 function pickManchete(events: PublicLogEntry[]): string {
+  const hasLoboR4 = events.some((e) =>
+    isLobisomemObjectiveR4FolhetimMessage(String(e.message ?? "")),
+  );
   if (events.some((e) => e.type === "death")) return "UM MORTO NO AÇUDE";
   if (events.some((e) => e.type === "bite")) return "MARCAS ESTRANHAS NA CIDADE";
   if (events.some((e) => e.type === "terror")) return "TERROR NO ALVORECER";
   if (events.some((e) => e.type === "invocation")) return "UMA PRESENÇA RETORNA";
+  if (hasLoboR4) return "QUATRO LUAS";
   return "ACONTECEU NA MADRUGADA";
 }
 
@@ -77,9 +101,22 @@ export function buildAmanhecerFolhetim(dawnEntries: PublicLogEntry[]): Amanhecer
   }
   return {
     manchete: pickManchete(nightEvents),
-    paragraphs: nightEvents.map(eventToParagraph).filter(Boolean),
+    paragraphs: eventsToParagraphs(nightEvents),
     silentNight: false,
   };
+}
+
+/** Edição extra ao abrir a noite 4 (objetivo do Lobisomem registrado no início da rodada). */
+export function findLobisomemObjectiveR4Folhetim(
+  publicLog: PublicLogEntry[],
+  round: number,
+): AmanhecerFolhetim | null {
+  for (const e of publicLog) {
+    if (e.round !== round) continue;
+    const parsed = parseLobisomemObjectiveR4Folhetim(String(e.message ?? ""));
+    if (parsed) return { ...parsed, silentNight: false };
+  }
+  return null;
 }
 
 export { DAY_PHASE_OPENING };
@@ -93,7 +130,8 @@ export function isNightPublicSpecialEntry(e: PublicLogEntry): boolean {
   const m = String(e.message ?? "");
   return (
     m.startsWith("Alinhamento (1ª noite):") ||
-    m.includes("Mesa de cinco: por regra do cordel")
+    m.includes("Mesa de cinco: por regra do cordel") ||
+    isLobisomemObjectiveR4FolhetimMessage(m)
   );
 }
 
@@ -114,9 +152,23 @@ export function filterDayPlazaPublicLog(
     return (
       t === "special" &&
       !isNightPublicSpecialEntry(e) &&
-      !isDelegadoPrisonPublicEntry(e)
+      !isDelegadoPrisonPublicEntry(e) &&
+      !isGossipFolhetimMessage(String(e.message ?? "")) &&
+      !isTieFolkloreIntactFolhetimMessage(String(e.message ?? ""))
     );
   });
+}
+
+function mergeUniqueParagraphs(base: string[], extra: string[]): string[] {
+  const seen = new Set(base);
+  const out = [...base];
+  for (const p of extra) {
+    if (p && !seen.has(p)) {
+      seen.add(p);
+      out.push(p);
+    }
+  }
+  return out;
 }
 
 /** Edição completa da rodada: madrugada + desfechos da praça (quando existirem). */
@@ -135,6 +187,6 @@ export function buildRoundFolhetim(
 
   return {
     ...base,
-    paragraphs: [...base.paragraphs, ...plazaParagraphs],
+    paragraphs: mergeUniqueParagraphs(base.paragraphs, plazaParagraphs),
   };
 }

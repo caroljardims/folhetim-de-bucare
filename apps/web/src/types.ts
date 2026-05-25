@@ -23,10 +23,11 @@ export type EvidenceEntry = {
   id: string;
   round: number;
   type: string;
-  targetId: string;
+  targetId: string | null;
   description: string;
   weight: EvidenceWeight;
   createdAt?: number;
+  location?: string;
 };
 
 export type LocationHistoryEntry = {
@@ -110,6 +111,8 @@ export type RoomDoc = DocumentData & {
   fiveTableMoradorIds?: string[];
   soloMode?: boolean;
   soloModeDifficulty?: SoloModeDifficulty;
+  /** Papéis dos 6 bots nesta partida (sem detetive) — para mapa/guia sem revelar quem é quem. */
+  tableRoleIds?: string[];
   detectiveGuesses?: Record<string, string> | null;
   detectiveScore?: {
     correct: number;
@@ -122,8 +125,14 @@ export type RoomDoc = DocumentData & {
   detectivePhase?: "accusation" | "reveal" | "score" | "done" | null;
   detectiveEliminatedAt?: number | { seconds: number; nanoseconds?: number } | null;
   detectiveEliminationCause?: "night" | "vote" | "other";
+  detectiveEliminationRound?: number | null;
   detectiveGhostObservation?: boolean;
   detectiveGhostObservationRound?: number;
+  soloGamePendingEnd?: boolean;
+  soloGameEndDeadline?: number | { seconds: number; nanoseconds?: number } | null;
+  soloGameEnded?: boolean;
+  /** Dia em que o caderno aguarda o chat antes de anotar silêncio suspeito. */
+  detectiveSilencioPendingRound?: number | null;
   apocalipseRoboDetected?: boolean;
   apocalipseRoboPendingDay?: boolean;
   apocalipseRoboAt?: number | { seconds: number; nanoseconds?: number } | null;

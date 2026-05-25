@@ -57,7 +57,7 @@ export const LOCATION_LABEL_PT: Record<BucareLocation, string> = {
   igreja: "Igreja",
   floresta: "Floresta",
   posto_de_saude: "Posto de Saúde",
-  tenda: "Tenda da Cartomante",
+  tenda: "Tenda Misteriosa",
   terreiro: "Terreiro",
   casa: "Casas dos Moradores",
   cemiterio: "Cemitério",

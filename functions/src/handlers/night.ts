@@ -31,6 +31,9 @@ export const submitNightAction = onCall(async (req) => {
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
   if (room.status !== "night") throw new HttpsError("failed-precondition", "Não é fase da noite.");
+  if (room.soloGamePendingEnd === true) {
+    throw new HttpsError("failed-precondition", "A investigação está encerrando.");
+  }
 
   const [players, secrets] = await Promise.all([loadPlayers(code), loadSecrets(code)]);
   const me = findPlayer(players, req);
@@ -88,6 +91,10 @@ export const submitNightAction = onCall(async (req) => {
     {
       round: Number(room.round ?? 1),
       expectedRole: mySecret.role,
+      soloModeDifficulty:
+        room.soloMode === true
+          ? (room.soloModeDifficulty as "story" | "investigation" | undefined)
+          : undefined,
       tablePlayerCount:
         room.gameTablePlayerCount != null ? Number(room.gameTablePlayerCount) : undefined,
       priorInvestigationTargetIds,
@@ -262,7 +269,17 @@ export const startNight = onCall(async (req) => {
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
   const players = await loadPlayers(code);
-  assertRoomHost(room, players, req, "Apenas o anfitrião pode iniciar a noite.");
+  if (room.soloMode === true) {
+    const me = findPlayer(players, req);
+    if (!me || me.isBot) {
+      throw new HttpsError("permission-denied", "Apenas o detetive pode iniciar a noite.");
+    }
+  } else {
+    assertRoomHost(room, players, req, "Apenas o anfitrião pode iniciar a noite.");
+  }
+  if (room.soloGamePendingEnd === true) {
+    throw new HttpsError("failed-precondition", "A investigação está encerrando.");
+  }
   if (!room.pendingNightStart) throw new HttpsError("failed-precondition", "Noite ainda não pronta para iniciar.");
 
   const nextRound = Number(room.pendingNightRound ?? (Number(room.round ?? 1) + 1));

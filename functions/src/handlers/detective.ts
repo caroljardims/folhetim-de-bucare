@@ -4,13 +4,18 @@ import type { RoleId } from "folclore-game-engine";
 import { db, loadPlayers, loadSecrets } from "../helpers.js";
 import { findPlayer, requireAuth } from "./shared.js";
 import {
+  canSubmitDetectiveGuesses,
   scoreDetectiveGuesses,
   type DetectiveRank,
   type SoloModeDifficulty,
 } from "../lib/detectiveTypes.js";
 import { finalizeMvpLedgerIfNeeded } from "../lib/endGameScoring.js";
 import { updateDetectiveUserStats } from "../lib/detectiveStats.js";
-import { completeDetectiveGhostObservation as finishDetectiveGhostObservation } from "../lib/detectiveElimination.js";
+import {
+  completeDetectiveGhostObservation as finishDetectiveGhostObservation,
+  triggerDetectiveEndGame,
+} from "../lib/detectiveElimination.js";
+import { syncSilencioSuspeitoForDay } from "../lib/detectiveEvidence/index.js";
 
 const GUESSABLE_ROLES = new Set<RoleId>([
   "lobisomem", "saci", "mula", "boto", "iara", "geni", "bras_cubas", "cangaceiro",
@@ -28,8 +33,8 @@ export const submitDetectiveGuesses = onCall(async (req) => {
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
   if (room.soloMode !== true) throw new HttpsError("failed-precondition", "Não é Modo Detetive.");
-  if (room.detectivePhase !== "accusation") {
-    throw new HttpsError("failed-precondition", "Acusação já enviada.");
+  if (!canSubmitDetectiveGuesses(room)) {
+    throw new HttpsError("failed-precondition", "Placar já registrado.");
   }
 
   const players = await loadPlayers(code);
@@ -85,6 +90,48 @@ export const submitDetectiveGuesses = onCall(async (req) => {
   return { ok: true, detectiveScore };
 });
 
+/** Atualiza pistas de silêncio após o chat do dia (Modo História). */
+export const syncDetectiveDayEvidence = onCall(async (req) => {
+  requireAuth(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  if (!code) throw new HttpsError("invalid-argument", "Código inválido.");
+
+  const roomRef = db.collection("rooms").doc(code);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
+  const room = roomSnap.data()!;
+  if (room.soloMode !== true) throw new HttpsError("failed-precondition", "Não é Modo Detetive.");
+
+  const players = await loadPlayers(code);
+  const me = findPlayer(players, req);
+  if (!me || me.isBot) throw new HttpsError("permission-denied", "Apenas o detetive.");
+
+  const dayRound = Number(req.data?.dayRound ?? room.votesRound ?? room.round ?? 1);
+  await syncSilencioSuspeitoForDay(code, dayRound);
+  return { ok: true };
+});
+
+export const triggerDetectiveEndGameCallable = onCall(async (req) => {
+  requireAuth(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  if (!code) throw new HttpsError("invalid-argument", "Código inválido.");
+
+  const roomRef = db.collection("rooms").doc(code);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
+  const room = roomSnap.data()!;
+  if (room.soloMode !== true) throw new HttpsError("failed-precondition", "Não é Modo Detetive.");
+
+  const players = await loadPlayers(code);
+  const me = findPlayer(players, req);
+  if (!me || me.isBot) throw new HttpsError("permission-denied", "Apenas o detetive.");
+
+  const ok = await triggerDetectiveEndGame(code);
+  if (!ok) throw new HttpsError("failed-precondition", "Não foi possível encerrar a investigação.");
+  return { ok: true };
+});
+
+/** @deprecated Prefer triggerDetectiveEndGameCallable */
 export const completeDetectiveGhostObservation = onCall(async (req) => {
   requireAuth(req);
   const code = String(req.data?.roomCode ?? "").toUpperCase().trim();

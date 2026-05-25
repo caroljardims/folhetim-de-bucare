@@ -5460,6 +5460,17 @@ input::placeholder {
   padding-bottom: 16px;
 }
 
+/* Edição final solo: preenche o espaço abaixo do top-bar, sem vazar sob o rodapé fixo */
+.fase--fim.page:has(.screen--solo-end-orchestrator) {
+  padding-top: 8px;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.fase--fim.page:has(.screen--solo-end-orchestrator) > .top-bar--game {
+  flex-shrink: 0;
+}
+
 .fase--fim .online-pill {
   display: none;
 }
@@ -5754,6 +5765,139 @@ input::placeholder {
   padding-top: 8px;
 }
 
+.fim-pages-footer--fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  pointer-events: auto;
+  min-height: 48px;
+  height: auto;
+  margin-top: 0;
+  padding: 0 12px env(safe-area-inset-bottom, 0);
+  display: flex;
+  align-items: center;
+  background: linear-gradient(180deg, transparent 0%, rgba(8, 6, 4, 0.92) 28%, var(--noite) 100%);
+  border-top: 1px solid rgba(166, 139, 103, 0.22);
+}
+
+.fim-pages-footer--fixed .pages-nav {
+  width: 100%;
+  height: 48px;
+  align-items: center;
+}
+
+.fim-pages-footer--fixed .pages-nav__btn {
+  position: relative;
+  z-index: 1;
+  min-height: 44px;
+  padding: 8px 12px;
+}
+
+.pages-nav__btn--prev:disabled,
+.pages-nav__btn--next:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.pages-nav__btn--play-again {
+  color: var(--ouro-claro);
+}
+
+/* ── Solo Detetive — edição final em 5 passos ── */
+
+.screen--solo-end-orchestrator {
+  --solo-end-footer-h: calc(52px + env(safe-area-inset-bottom, 0px));
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.screen--solo-end-orchestrator .fim-edition-label {
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+.solo-end-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: var(--solo-end-footer-h);
+}
+
+.solo-end-loading {
+  margin: auto;
+  text-align: center;
+}
+
+.screen--solo-end-orchestrator .fim-page--manchete {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.screen--solo-end-orchestrator .fim-page--cronica-orchestrated {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.screen--solo-end-orchestrator .fim-page--cronica-orchestrated > .fim-section-eyebrow {
+  flex-shrink: 0;
+}
+
+.screen--solo-end-orchestrator .cronica-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.screen--solo-end-orchestrator .folhetim--fim-cronica {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.screen--solo-end-orchestrator .fim-cronica-header {
+  flex-shrink: 0;
+}
+
+.screen--solo-end-orchestrator .fim-cronica-body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 12px;
+}
+
+.screen--solo-end-orchestrator .caderno-close-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* ══════════════════════════════════════════════
    CHROME — game screen header bar
    ══════════════════════════════════════════════ */
@@ -5882,7 +6026,9 @@ input::placeholder {
   padding: 0 12px 12px;
 }
 
-.detective-end {
+/* Overlay / acusação fora do orquestrador (cobre a partida) */
+.detective-end-overlay .detective-end,
+.detective-end:not(.detective-end-stage) {
   position: fixed;
   inset: 0;
   z-index: 150;
@@ -5893,6 +6039,57 @@ input::placeholder {
   justify-content: center;
   padding: 24px;
   text-align: center;
+}
+
+/* Passos 3–5 dentro do orquestrador: não cobrir a navegação inferior */
+.screen--solo-end-orchestrator .detective-end.detective-end-stage {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  justify-content: flex-start;
+  text-align: left;
+  background: transparent;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen--solo-end-orchestrator .detective-end--accusation.detective-end-stage {
+  padding: 0 0 4px;
+}
+
+.screen--solo-end-orchestrator .detective-end--accusation .detective-end__title,
+.screen--solo-end-orchestrator .detective-end--accusation .detective-end__subtitle {
+  flex-shrink: 0;
+}
+
+.screen--solo-end-orchestrator .detective-end--accusation .caderno-wrap--final {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.screen--solo-end-orchestrator .detective-end--accusation .caderno__body-scroll--final {
+  max-height: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.screen--solo-end-orchestrator .detective-final-cta {
+  flex-shrink: 0;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.screen--solo-end-orchestrator .detective-end--score-orchestrated {
+  overflow: hidden;
+  background: var(--noite);
 }
 
 .detective-end__rank {
@@ -5913,6 +6110,56 @@ input::placeholder {
 
 .detective-guide__body section {
   margin-bottom: 1.5rem;
+}
+
+.detective-guide__places-note {
+  font-style: italic;
+  color: var(--texto-medio);
+  margin-bottom: 1rem;
+}
+
+.detective-guide__places-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.detective-guide__place {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed rgba(201, 169, 110, 0.2);
+}
+
+.detective-guide__place:last-child {
+  border-bottom: none;
+}
+
+.detective-guide__place-name {
+  font-family: "Special Elite", var(--ff-cordel);
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.35rem;
+}
+
+.detective-guide__place-desc {
+  font-family: "Caveat", cursive;
+  font-size: 1.15rem;
+  line-height: 1.4;
+  margin: 0 0 0.5rem;
+  color: var(--texto-medio);
+}
+
+.detective-guide__place-inhab {
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.detective-guide__place-inhab-label {
+  font-family: var(--ff-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--texto-poeira);
 }
 
 /* ── Apocalipse Robô — observation day + interstitial ── */

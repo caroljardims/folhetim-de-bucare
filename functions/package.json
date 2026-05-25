@@ -10,7 +10,7 @@
     "build": "npm --prefix .. run build -w folclore-game-engine && node esbuild.mjs",
     "typecheck": "tsc --noEmit",
     "test:botchat": "tsx --test src/lib/botChat/botChat.test.ts src/lib/botChat/botChat.smoke.ts src/lib/botKnowledge/botKnowledge.test.ts",
-    "test:detective": "tsx --test src/lib/detectiveEvidence/detectiveEvidence.test.ts",
+    "test:detective": "tsx --test src/lib/detectiveEvidence/detectiveEvidence.test.ts src/lib/detectiveLocationResolve.test.ts src/lib/detectiveElimination.test.ts src/lib/detectiveTypes.test.ts",
     "serve": "npm run build && firebase emulators:start --only functions"
   },
   "dependencies": {

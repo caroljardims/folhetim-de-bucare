@@ -21,6 +21,9 @@ export const submitVote = onCall(async (req) => {
   if (room.apocalipseRoboPendingDay === true) {
     throw new HttpsError("failed-precondition", "A praça observa o Apocalipse Robô — votação encerrada.");
   }
+  if (room.soloGamePendingEnd === true) {
+    throw new HttpsError("failed-precondition", "A investigação está encerrando.");
+  }
 
   const voteRound = Number(room.votesRound ?? room.round ?? 1);
   if (Number(room.voidedDayExpulsionRound) === voteRound) {

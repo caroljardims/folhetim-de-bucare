@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RoomDoc } from "../../types.js";
 import {
-  detectiveGhostObservationRemainingMs,
+  soloGameEndRemainingMs,
   type DetectiveEliminationCause,
 } from "../../lib/detectiveElimination.js";
 import { BtnSpinner } from "../BtnSpinner.js";
@@ -23,16 +23,13 @@ export function DetectiveGhostObservationPanel({ room, roomCode, cause, run, bus
     return () => window.clearInterval(id);
   }, []);
 
-  const remainingMs = useMemo(
-    () => detectiveGhostObservationRemainingMs(room, now),
-    [room, now],
-  );
+  const remainingMs = useMemo(() => soloGameEndRemainingMs(room, now), [room, now]);
   const remainingSec = Math.ceil(remainingMs / 1000);
   const progress = 1 - remainingMs / 60_000;
 
   useEffect(() => {
     if (remainingMs > 0) return;
-    void run("completeDetectiveGhostObservation", { roomCode }, "detectiveGhostEnd").catch(() => {});
+    void run("triggerDetectiveEndGameCallable", { roomCode }, "detectiveGhostEnd").catch(() => {});
   }, [remainingMs, roomCode, run]);
 
   return (
@@ -68,14 +65,14 @@ export function DetectiveGhostObservationPanel({ room, roomCode, cause, run, bus
           <div className="apocalypse-observe__timer-bar" style={{ transform: `scaleX(${progress})` }} />
         </div>
         <p className="apocalypse-observe__countdown">
-          A investigação encerra em {remainingSec}s
+          A partida encerra em {remainingSec}s
         </p>
         <button
           type="button"
           className="ghost-btn apocalypse-observe__cta"
           disabled={busy("detectiveGhostEnd")}
           onClick={() =>
-            void run("completeDetectiveGhostObservation", { roomCode }, "detectiveGhostEnd")
+            void run("triggerDetectiveEndGameCallable", { roomCode }, "detectiveGhostEnd")
           }
         >
           <span className="btn-with-spinner">

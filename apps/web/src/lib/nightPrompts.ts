@@ -6,6 +6,7 @@ export function nightPrompt(
     action: string;
     suspicionOnly: boolean;
     waiting: boolean;
+    reconNight?: boolean;
   },
 ): string {
   if (opts.suspicionOnly) {
@@ -15,7 +16,8 @@ export function nightPrompt(
     return "A vila dorme. Aguarde o amanhecer.";
   }
   if (role === "detetive") {
-    if (opts.myTurn) return "Onde você vai investigar esta noite?";
+    if (opts.reconNight) return "";
+    if (opts.myTurn) return "";
     return "A cidade dorme. Aguarde o amanhecer.";
   }
   if (!opts.myTurn) {

@@ -1,4 +1,5 @@
 import { closeDetectiveGuideToHome } from "../../lib/detectiveRoute.js";
+import { DETECTIVE_LOCATION_GUIDE } from "../../lib/detectiveLocationGuide.js";
 
 export function DetectiveGuideScreen() {
   return (
@@ -35,9 +36,13 @@ export function DetectiveGuideScreen() {
         <section>
           <h2>Rondas noturnas</h2>
           <p>
-            A cada noite, você pode rondar um lugar em Bucaré. Se o lugar estiver vazio, alguém estava agindo nas
-            sombras. Se estiver ocupado, seus habitantes têm um alibi para aquela noite. Alguns lugares têm mais de um
-            habitante — nesses casos, a investigação exige mais paciência.
+            No <strong>Modo História</strong>, sua primeira noite é uma ronda por toda Bucaré — impressões
+            atmosféricas, sem acusações. A partir da segunda noite, você escolhe um lugar por noite. No{" "}
+            <strong>Modo Investigação</strong>, cada noite funciona como uma investigação focada em um único local.
+          </p>
+          <p>
+            Se o lugar estiver vazio, alguém estava agindo nas sombras. Se estiver ocupado, seus habitantes têm um
+            alibi para aquela noite.
           </p>
         </section>
 
@@ -51,6 +56,25 @@ export function DetectiveGuideScreen() {
             <li>
               Cada habitante de Bucaré tem seus hábitos. Aprenda a reconhecê-los.
             </li>
+          </ul>
+        </section>
+
+        <section className="detective-guide__places">
+          <h2>Os lugares de Bucaré</h2>
+          <p className="detective-guide__places-note">
+            Nem todos estarão em Bucaré em cada partida. Mas os que estiverem, dormem onde sempre dormiram.
+          </p>
+          <ul className="detective-guide__places-list">
+            {DETECTIVE_LOCATION_GUIDE.map((entry) => (
+              <li key={entry.location} className="detective-guide__place">
+                <h3 className="detective-guide__place-name">{entry.label}</h3>
+                <p className="detective-guide__place-desc">&ldquo;{entry.description}&rdquo;</p>
+                <p className="detective-guide__place-inhab">
+                  <span className="detective-guide__place-inhab-label">Quem costuma estar por lá:</span>{" "}
+                  {entry.inhabitantLabels.join(" · ")}
+                </p>
+              </li>
+            ))}
           </ul>
         </section>
 

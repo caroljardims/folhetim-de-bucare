@@ -15,12 +15,13 @@ export async function appendEvidence(
     .doc(humanPlayerId);
   const snap = await playerRef.get();
   const existing = (snap.data()?.evidenceLog ?? []) as EvidenceEntry[];
-  const isDuplicate = existing.some(
-    (e) =>
-      e.targetId === entry.targetId &&
-      e.type === entry.type &&
-      e.round === entry.round,
-  );
+  const isDuplicate = existing.some((e) => {
+    if (e.type !== entry.type || e.round !== entry.round) return false;
+    if (entry.type === "reconhecimento_noturno" || entry.location) {
+      return e.location === entry.location && (e.targetId ?? null) === (entry.targetId ?? null);
+    }
+    return (e.targetId ?? null) === (entry.targetId ?? null);
+  });
   if (isDuplicate) return;
 
   const full: EvidenceEntry = {

@@ -2,7 +2,6 @@ import { FieldValue } from "firebase-admin/firestore";
 import { NIGHT_ACTION_ORDER, ROLE_SIDE } from "folclore-game-engine";
 import type { RoleId } from "folclore-game-engine";
 import { db } from "./lib/db.js";
-import { grantObjectiveMvp } from "./lib/playerPrivateScore.js";
 
 export { db } from "./lib/db.js";
 
@@ -52,41 +51,17 @@ export async function startNightSequence(roomCode: string, round: number) {
   );
   const order = nightRolesInPlay(secrets, alive);
 
-  const loboUpdates: Promise<unknown>[] = [];
-  if (round === 4) {
-    const loboPlayer = players.find((p) => secrets[p.id]?.role === "lobisomem");
-    if (loboPlayer && loboPlayer.alive !== false && !loboPlayer.eliminated && !loboPlayer.expelled && !loboPlayer.individualObjectiveMet) {
-      const roomRef = db.collection("rooms").doc(roomCode);
-      loboUpdates.push(
-        roomRef.collection("players").doc(loboPlayer.id).update({ individualObjectiveMet: true }),
-        roomRef.update({
-          individualWins: FieldValue.arrayUnion({
-            playerId: loboPlayer.id,
-            role: "lobisomem",
-            type: "lobisomem_survived_r4",
-            round,
-            timestamp: Date.now(),
-          }),
-        }),
-        grantObjectiveMvp(roomCode, loboPlayer.id, round),
-      );
-    }
-  }
-
-  await Promise.all([
-    db.collection("rooms").doc(roomCode).update({
-      status: "night",
-      phase: "night",
-      round,
-      nightPhaseIndex: 0,
-      currentActorRole: null,
-      nightOrderRoles: order,
-      nightPendingRoles: order,
-      nightReadyPlayerIds: [],
-      pendingSaciGorro: FieldValue.delete(),
-    }),
-    ...loboUpdates,
-  ]);
+  await db.collection("rooms").doc(roomCode).update({
+    status: "night",
+    phase: "night",
+    round,
+    nightPhaseIndex: 0,
+    currentActorRole: null,
+    nightOrderRoles: order,
+    nightPendingRoles: order,
+    nightReadyPlayerIds: [],
+    pendingSaciGorro: FieldValue.delete(),
+  });
 }
 
 export { ROLE_SIDE };

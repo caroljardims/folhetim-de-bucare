@@ -1,8 +1,19 @@
-import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { FieldValue, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { ROLE_SIDE, displayRoleName, type RoleId } from "folclore-game-engine";
-import { loadPlayers, loadSecrets } from "../../helpers.js";
+import { loadPlayers, loadSecrets, randomId } from "../../helpers.js";
 import { db } from "../db.js";
+import type { EvidenceEntry } from "../detectiveTypes.js";
 import { appendEvidence } from "./append.js";
+
+export function victimNameFromDeathLog(message: string): string {
+  const bracket = message.match(/\[([^\]]+)\]/);
+  if (bracket?.[1]) return bracket[1].trim();
+  const found = message.match(
+    /(?:ausência\.\s*|^)([^.]+?)\s+foi encontrad[oa]/i,
+  );
+  if (found?.[1]) return found[1].trim();
+  return "alguém";
+}
 
 /** Player IDs who sent at least one non-vote chat message in the given day round. */
 export function speakerIdsFromChatDocs(
@@ -154,4 +165,56 @@ export async function appendSilencioSuspeito(
       description: `${nameById.get(bid) ?? bid} não disse uma palavra na rodada em que ${victimName} morreu.`,
     });
   }
+}
+
+/** Recalcula silêncio suspeito após o chat do dia (substitui entradas da rodada). */
+export async function syncSilencioSuspeitoForDay(
+  roomCode: string,
+  dayRound: number,
+): Promise<void> {
+  const gate = await isStorySoloRoom(roomCode);
+  if (!gate.ok || !gate.humanPlayerId) return;
+
+  const roomRef = db.collection("rooms").doc(roomCode);
+  const logSnap = await roomRef
+    .collection("publicLogEntries")
+    .where("round", "==", dayRound)
+    .where("type", "==", "death")
+    .limit(1)
+    .get();
+
+  if (logSnap.empty) {
+    await roomRef.update({ detectiveSilencioPendingRound: FieldValue.delete() });
+    return;
+  }
+
+  const deathMsg = String(logSnap.docs[0]!.data().message ?? "");
+  const victimName = victimNameFromDeathLog(deathMsg);
+
+  const players = await loadPlayers(roomCode);
+  const nameById = new Map(players.map((p) => [p.id, String(p.name ?? p.id)]));
+  const aliveBotIds = players
+    .filter((p) => p.isBot && p.alive !== false && !p.eliminated && !p.expelled)
+    .map((p) => p.id);
+  const silentBots = await botIdsSilentInDayRound(roomCode, dayRound, aliveBotIds);
+
+  const playerRef = roomRef.collection("players").doc(gate.humanPlayerId);
+  const snap = await playerRef.get();
+  const existing = (snap.data()?.evidenceLog ?? []) as EvidenceEntry[];
+  const kept = existing.filter(
+    (e) => !(e.type === "silencio_suspeito" && e.round === dayRound),
+  );
+  const now = Date.now();
+  const fresh = silentBots.map((bid) => ({
+    id: randomId(),
+    round: dayRound,
+    type: "silencio_suspeito" as const,
+    targetId: bid,
+    weight: "leve" as const,
+    description: `${nameById.get(bid) ?? bid} não disse uma palavra na rodada em que ${victimName} morreu.`,
+    createdAt: now,
+  }));
+
+  await playerRef.update({ evidenceLog: [...kept, ...fresh] });
+  await roomRef.update({ detectiveSilencioPendingRound: FieldValue.delete() });
 }

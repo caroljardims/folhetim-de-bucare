@@ -1,3 +1,4 @@
+import { isLobisomemObjectiveR4FolhetimMessage } from "folclore-game-engine";
 import { describeNightAction } from "../../lib/describeNightAction.js";
 import { individualWinChronicleLine } from "../../lib/individualWinLabels.js";
 import { ROLE_DISPLAY } from "../../lib/roleStories.js";
@@ -6,7 +7,11 @@ import type { PlayerDoc, PublicLogEntry, RoomDoc } from "../../types.js";
 /** Entradas `special` que pertencem à fase da noite / abertura (não ao cordel do dia). */
 function isNightPublicSpecial(e: PublicLogEntry): boolean {
   const m = String(e.message ?? "");
-  return m.startsWith("Alinhamento (1ª noite):") || m.includes("Mesa de cinco: por regra do cordel");
+  return (
+    m.startsWith("Alinhamento (1ª noite):") ||
+    m.includes("Mesa de cinco: por regra do cordel") ||
+    isLobisomemObjectiveR4FolhetimMessage(m)
+  );
 }
 
 function dedupeChronicleEndEntries(entries: PublicLogEntry[]): PublicLogEntry[] {

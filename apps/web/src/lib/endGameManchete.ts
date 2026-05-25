@@ -3,8 +3,24 @@ import { ROLE_DISPLAY } from "./roleStories.js";
 
 export type EndManchete = {
   manchete: string;
-  body: string;
+  paragraphs: string[];
 };
+
+function moradoresLobisomemVictoryParagraphs(name: string): string[] {
+  const n = name.trim() || "Alguém";
+  return [
+    "Bucaré respirou fundo na manhã em que tudo acabou.",
+    `Não foi fácil. Nunca é fácil quando o perigo tem rosto conhecido, quando a fera senta à mesma mesa, bebe da mesma água, cumprimenta os mesmos vizinhos toda manhã. ${n} estava lá desde o início — sorrindo, conversando, existindo entre os moradores como se fosse uma deles. Como se sempre tivesse sido.`,
+    "A cidade desconfiou de todo mundo antes de desconfiar da pessoa certa. É assim que o folclore sobrevive — não pela força, mas pela dúvida que planta nos corações de quem deveria estar unido. Enquanto Bucaré apontava dedos pros lados errados, enquanto os votos se dividiam e os dias passavam sem resolução, o Lobisomem dormia tranquilo entre os seus.",
+    "Mas Bucaré é teimosa. Sempre foi.",
+    "Rodada por rodada, a cidade foi juntando os pedaços. Um olhar fora de hora. Uma palavra que não fechava. Um voto que ia sempre pro mesmo lugar sem razão aparente. A verdade não chegou de uma vez — chegou aos poucos, como cheia de rio, que sobe devagar até que de repente não tem mais como segurar.",
+    `Quando a cidade apontou o dedo pra ${n}, não havia mais dúvida. A expulsão foi feita com a seriedade de quem sabe o peso do que está fazendo. E quando a identidade foi revelada — Lobisomem, confirmado, sem mais disfarce — Bucaré ficou em silêncio por um momento longo demais.`,
+    "Não foi de surpresa. Foi de alívio.",
+    "A praça da Bucarezeira viu tudo, como sempre vê. As raízes guardaram mais uma história — a de uma cidade que olhou pro perigo nos olhos, reconheceu o que era, e não recuou. O folclore voltou pro mato, pro rio, pra escuridão de onde veio.",
+    "Por enquanto.",
+    "Bucaré pode dormir. Mas a cidade que sobreviveu ao Lobisomem sabe que o sertão guarda mais do que uma criatura. A próxima lua cheia já está chegando — e o folclore tem memória longa.",
+  ];
+}
 
 const SIDE_OF_ROLE: Record<string, string> = {
   lobisomem: "criatura",
@@ -52,36 +68,42 @@ export function buildEndManchete(room: RoomDoc, players: PlayerDoc[]): EndManche
   if (room.winner === "bots") {
     return {
       manchete: "APOCALIPSE ROBÔ",
-      body: "As criaturas fugiram. Os moradores sumiram. Algo que não veio do rio, do mato ou do sertão desceu sobre Bucaré sem avisar. Não tinha gorro vermelho. Não tinha escama. Não tinha maldição. Tinha circuito. Os robôs tomaram a praça, abduzindo tudo que era carne, folclore ou mistério — e a Bucaré ficou olhando, sem saber o que fazer com raízes que nunca viram isso antes. O cordel não tem estrofe pra apocalipse robô.",
+      paragraphs: [
+        "As criaturas fugiram. Os moradores sumiram. Algo que não veio do rio, do mato ou do sertão desceu sobre Bucaré sem avisar. Não tinha gorro vermelho. Não tinha escama. Não tinha maldição. Tinha circuito. Os robôs tomaram a praça, abduzindo tudo que era carne, folclore ou mistério — e a Bucaré ficou olhando, sem saber o que fazer com raízes que nunca viram isso antes. O cordel não tem estrofe pra apocalipse robô.",
+      ],
     };
   }
 
   if (moradoresPlazaTie) {
     return {
       manchete: "A PRAÇA DECIDIU",
-      body: "A cidade segurou o fôlego. O folclore e os moradores ficaram frente a frente na praça — iguais em número. No empate, a cidade resistiu. Bucaré pode dormir tranquila.",
+      paragraphs: [
+        "A cidade segurou o fôlego. O folclore e os moradores ficaram frente a frente na praça — iguais em número. No empate, a cidade resistiu. Bucaré pode dormir tranquila.",
+      ],
     };
   }
 
   if (room.winner === "moradores") {
     const wolf = playerWithRole(players, revealed, "lobisomem");
-    const body = wolf
-      ? `A vila identificou o ${ROLE_DISPLAY.lobisomem ?? "Lobisomem"} (${wolf}) e Bucaré pode dormir tranquila.`
-      : "O folclore recuou para as sombras. Os moradores venceram — e Bucaré pode dormir tranquila.";
     return {
       manchete: "A VILA VENCEU O FOLCLORE",
-      body,
+      paragraphs: wolf
+        ? moradoresLobisomemVictoryParagraphs(wolf)
+        : [
+            "O folclore recuou para as sombras. Os moradores venceram — e Bucaré pode dormir tranquila.",
+          ],
     };
   }
 
   if (room.winner === "criaturas") {
     const creature = firstCreatureName(players, revealed);
-    const body = creature
-      ? `Quando a fumaça baixou, o folclore tinha mais sombra do que gente na praça. ${creature} e os demais segredos da noite ficaram por cima.`
-      : "Quando a fumaça baixou, havia mais sombra do que gente na praça. O folclore engoliu a vila.";
     return {
       manchete: "AS CRIATURAS DOMINARAM BUCARÉ",
-      body,
+      paragraphs: [
+        creature
+          ? `Quando a fumaça baixou, o folclore tinha mais sombra do que gente na praça. ${creature} e os demais segredos da noite ficaram por cima.`
+          : "Quando a fumaça baixou, havia mais sombra do que gente na praça. O folclore engoliu a vila.",
+      ],
     };
   }
 
@@ -91,6 +113,8 @@ export function buildEndManchete(room: RoomDoc, players: PlayerDoc[]): EndManche
   const roleLabel = wpRole ? (ROLE_DISPLAY[wpRole] ?? wpRole) : "o destino";
   return {
     manchete: `${wpName.toUpperCase()} VENCEU`,
-    body: `${wpName} (${roleLabel}) cumpriu o que veio buscar nesta edição — e a praça ficará tempo contando essa história.`,
+    paragraphs: [
+      `${wpName} (${roleLabel}) cumpriu o que veio buscar nesta edição — e a praça ficará tempo contando essa história.`,
+    ],
   };
 }

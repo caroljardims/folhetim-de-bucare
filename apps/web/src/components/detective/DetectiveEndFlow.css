@@ -1,4 +1,347 @@
-/* ── Modo Detetive — revelation showcase & score clipping ── */
+/* ── Modo Detetive — fim de jogo (orquestrado e overlay) ── */
+
+.detective-end-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detective-end--accusation.detective-end-stage,
+.detective-end--caderno-close.detective-end-stage,
+.detective-end--edition.detective-end-stage,
+.detective-end--score.detective-end-stage {
+  padding: 0 16px;
+}
+
+.screen--solo-end-orchestrator .detective-end--caderno-close.detective-end-stage,
+.screen--solo-end-orchestrator .detective-end--edition.detective-end-stage {
+  padding: 0;
+}
+
+.detective-end--caderno-close {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.detective-end--edition {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.detective-edition-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 8px 16px 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.detective-end--score-orchestrated {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 0 4px;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.screen--solo-end-orchestrator .detective-end--score-orchestrated .folhetim-clipping {
+  flex: 1;
+  min-height: 0;
+  width: calc(100% - 32px);
+  max-width: 560px;
+  margin: 8px 16px 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: 24px;
+}
+
+.detective-end--score-orchestrated .folhetim-clipping,
+.detective-end--score-orchestrated .folhetim-clipping__report-header,
+.detective-end--score-orchestrated .folhetim-clipping__headline,
+.detective-end--score-orchestrated .folhetim-clipping__body,
+.detective-end--score-orchestrated .detective-score-actions {
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+.detective-end--score-orchestrated .folhetim-clipping {
+  margin-top: 8px;
+}
+
+.detective-score-anon--orchestrated {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 560px;
+  margin: 8px auto 4px;
+  padding: 0 16px;
+  text-align: center;
+}
+
+/* ── Caderno fecha (passo 3) ── */
+
+.caderno-close-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.caderno--close {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.caderno--close .caderno__paper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.caderno-close__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.caderno-close__header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.caderno-close__rule {
+  border: none;
+  border-top: 1px dashed var(--caderno-line);
+  margin: 10px 0;
+}
+
+.caderno-close__meta {
+  margin: 8px 0 0;
+  font-family: var(--caderno-font-hand);
+  font-size: 1.05rem;
+  color: var(--caderno-ink-muted);
+}
+
+.caderno-close__section {
+  margin-bottom: 20px;
+}
+
+.caderno-close__section-title {
+  margin: 0 0 12px;
+  text-align: center;
+  font-family: var(--caderno-font-type);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--caderno-ink-muted);
+}
+
+.caderno-close__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.caderno-close__row {
+  padding: 10px 0 12px;
+  border-bottom: 1px dashed var(--caderno-line);
+}
+
+.caderno-close__row:last-child {
+  border-bottom: none;
+}
+
+.caderno-close__row-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.caderno-close__who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.caderno-close__glyph {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
+.caderno-close__name {
+  font-family: var(--caderno-font-type);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--caderno-ink);
+  word-break: break-word;
+}
+
+.caderno-close__truth {
+  flex-shrink: 0;
+  font-family: var(--caderno-font-hand);
+  font-size: 1.15rem;
+  line-height: 1.25;
+  color: var(--caderno-ink);
+  text-align: right;
+  max-width: 48%;
+}
+
+.caderno-close__row-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding-left: 32px;
+}
+
+.caderno-close__theory {
+  font-family: var(--caderno-font-hand);
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--caderno-ink-muted);
+}
+
+.caderno-close__stamp {
+  flex-shrink: 0;
+  font-family: var(--caderno-font-type);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border: 2px solid currentColor;
+  transform: rotate(-2deg);
+}
+
+.caderno-close__stamp--correct {
+  color: #2d6a4f;
+  border-color: #2d6a4f;
+}
+
+.caderno-close__stamp--wrong {
+  color: #6b1a1a;
+  border-color: #6b1a1a;
+}
+
+.caderno-close__stamp--unknown {
+  color: #4a4a3a;
+  border-color: #4a4a3a;
+}
+
+/* ── Edição especial (passo 4) ── */
+
+.folhetim-clipping--edition-special {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+.folhetim-clipping__report-header {
+  text-align: center;
+  margin: 0 0 14px;
+}
+
+.folhetim-clipping__report-header-rule {
+  height: 1px;
+  border: none;
+  background: var(--clip-ink);
+  opacity: 0.35;
+  margin: 8px 0;
+}
+
+.folhetim-clipping__stamp--report {
+  margin: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--clip-red);
+  border-bottom: 1px solid var(--clip-red);
+  font-family: "Special Elite", var(--ff-cordel);
+  font-size: 9px;
+  font-variant: small-caps;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+  color: #8b2020;
+}
+
+.folhetim-clipping__stamp--special {
+  margin-top: 8px;
+  padding: 8px 0;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+
+.folhetim-clipping__city-headline {
+  margin: 16px 0 12px;
+  font-family: var(--ff-headline);
+  font-size: clamp(1.25rem, 4.5vw, 1.65rem);
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--clip-ink);
+}
+
+.folhetim-clipping__detective-summary {
+  margin: 0 0 16px;
+  font-family: var(--caderno-font-hand, var(--ff-hand));
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--clip-ink);
+  text-align: center;
+}
+
+.folhetim-clipping--edition-special .folhetim-clipping__scorebox {
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto 14px;
+}
+
+.folhetim-clipping__rank-line {
+  margin: 0 0 8px;
+  text-align: center;
+  font-family: var(--caderno-font-type, var(--ff-mono));
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--clip-ink);
+}
+
+.folhetim-clipping__rank-line strong {
+  font-weight: 700;
+}
+
+/* ── Legacy reveal (removido do fluxo principal) ── */
 
 .detective-end--reveal {
   justify-content: flex-start;

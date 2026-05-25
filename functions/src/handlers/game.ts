@@ -202,6 +202,7 @@ export const startSoloDetectiveGame = onCall(async (req) => {
     gameTablePlayerCount: 7,
     soloMode: true,
     soloModeDifficulty,
+    tableRoleIds: Object.values(botRoles),
     detectiveGuesses: null,
     detectiveScore: null,
     detectivePhase: null,
@@ -209,6 +210,11 @@ export const startSoloDetectiveGame = onCall(async (req) => {
     apocalipseRoboDetected: false,
     apocalipseRoboPendingDay: false,
     detectiveGhostObservation: false,
+    soloGamePendingEnd: false,
+    soloGameEndDeadline: null,
+    soloGameEnded: false,
+    detectiveEliminationRound: null,
+    detectiveSilencioPendingRound: null,
     createdAt: FieldValue.serverTimestamp(),
   });
 
@@ -568,6 +574,11 @@ export const restartGame = onCall(async (req) => {
     detectiveEliminationCause: FieldValue.delete(),
     detectiveGhostObservation: false,
     detectiveGhostObservationRound: FieldValue.delete(),
+    soloGamePendingEnd: false,
+    soloGameEndDeadline: FieldValue.delete(),
+    soloGameEnded: false,
+    detectiveEliminationRound: FieldValue.delete(),
+    detectiveSilencioPendingRound: FieldValue.delete(),
   });
 
   await batch.commit();

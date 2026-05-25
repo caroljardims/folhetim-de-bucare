@@ -19,7 +19,8 @@ export type EvidenceType =
   | "expulsao_reveladora"
   | "local_vazio"
   | "local_presente"
-  | "local_misto";
+  | "local_misto"
+  | "reconhecimento_noturno";
 
 export type LocationHistoryEntry = {
   round: number;
@@ -31,10 +32,11 @@ export type EvidenceEntry = {
   id: string;
   round: number;
   type: EvidenceType;
-  targetId: string;
+  targetId: string | null;
   description: string;
   weight: EvidenceWeight;
   createdAt: number;
+  location?: import("folclore-game-engine").BucareLocation;
 };
 
 export type DetectiveScore = {
@@ -51,6 +53,15 @@ export function rankFromCorrectCount(correct: number): DetectiveRank {
   if (correct >= 4) return "DETETIVE";
   if (correct >= 2) return "INVESTIGADOR";
   return "NOVATO";
+}
+
+/** Permite registrar palpites finais (inclui fim de partida após eliminação do detetive). */
+export function canSubmitDetectiveGuesses(room: Record<string, unknown>): boolean {
+  if (room.soloMode !== true) return false;
+  if (room.detectiveScore != null) return false;
+  if (room.detectivePhase === "accusation") return true;
+  if (room.status === "ended") return true;
+  return false;
 }
 
 export function scoreDetectiveGuesses(

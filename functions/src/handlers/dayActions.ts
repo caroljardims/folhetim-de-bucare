@@ -280,6 +280,14 @@ export const coronelStartAccusation = onCall(async (req) => {
 
   if (targetRole === "boitata") {
     await grantObjectiveMvp(code, me.id, round).catch(console.error);
+    const coronelWin = winsToUnion.find((w) => w.type === "coronel_acusacao_boitata");
+    if (coronelWin) {
+      const roomAfterCoronel = (await roomRef.get()).data() ?? {};
+      const { tryEndGameIndividual } = await import("../lib/individualEndGame.js");
+      if (await tryEndGameIndividual(code, round, roomAfterCoronel, coronelWin)) {
+        return { ok: true };
+      }
+    }
   }
 
   await finalizeDay(code, voteDayRound);
@@ -374,15 +382,32 @@ export const cangaceiroTiroCerto = onCall(async (req) => {
 
   await batch.commit();
 
-  if (creature && targetRole === "iara") {
+  const cangaceiroIaraWin =
+    creature && targetRole === "iara"
+      ? {
+          playerId: me.id,
+          role: "cangaceiro" as const,
+          type: "cangaceiro_iara",
+          round,
+          timestamp: Date.now(),
+        }
+      : null;
+
+  if (cangaceiroIaraWin) {
     await grantObjectiveMvp(code, me.id, round).catch(console.error);
   }
 
   const snapsAfter = await loadPlayers(code);
   const roomAfter = (await roomRef.get()).data() ?? {};
+  if (cangaceiroIaraWin) {
+    const { tryEndGameIndividual } = await import("../lib/individualEndGame.js");
+    if (await tryEndGameIndividual(code, round, roomAfter, cangaceiroIaraWin)) {
+      return { hit: creature, consulted, ended: true };
+    }
+  }
   if (roomAfter.soloMode === true && targetRole === "detetive") {
-    const { markDetectiveEliminatedIfNeeded } = await import("../lib/detectiveElimination.js");
-    await markDetectiveEliminatedIfNeeded(code, "other", round, snapsAfter).catch(console.error);
+    const { handleDetectiveElimination } = await import("../lib/detectiveElimination.js");
+    await handleDetectiveElimination(code, "other", round, snapsAfter).catch(console.error);
   }
 
   const { markApocalypseRoboIfNeeded } = await import("../lib/apocalypseRobot.js");

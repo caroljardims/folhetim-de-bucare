@@ -14,10 +14,11 @@ import {
 import { stablePlayerGlyph } from "../../lib/playerGlyph.js";
 import { ROLE_DISPLAY, ROLE_LORE, ROLE_XILO, RoleLoreContent } from "../../lib/roleStories.js";
 import type { PlayerPrivateDoc } from "../../hooks/useMyPlayerPrivate.js";
-import { DetectiveLocationNight } from "../detective/DetectiveLocationNight.js";
+import { DetectiveNightPassage } from "../detective/DetectiveNightPassage.js";
+import { DetectiveRecognitionNight } from "../detective/DetectiveRecognitionNight.js";
+import { pickRandomBucareLocation } from "../../lib/detectiveLocations.js";
 import { DetectiveGhostObservationPanel } from "../day/DetectiveGhostObservationPanel.js";
 import { isDetectiveGhostObservation } from "../../lib/detectiveElimination.js";
-import type { BucareLocation } from "../../lib/detectiveLocations.js";
 
 type ActionOpt = { value: string; label: string };
 
@@ -139,8 +140,15 @@ export function NightScreen({
   const detectiveGhostObservation = isDetectiveGhostObservation(room);
   const showDetectiveGhostPanel =
     detectiveGhostObservation && myPlayer && !myPlayer.isBot;
+  const isStoryReconNight =
+    soloMode &&
+    room.soloModeDifficulty === "story" &&
+    Number(room.round ?? 1) === 1 &&
+    myRole === "detetive" &&
+    myRoleIsPending &&
+    !detectiveGhostObservation;
   const detectiveLocationTurn =
-    soloMode && myRole === "detetive" && myRoleIsPending && !detectiveGhostObservation;
+    soloMode && myRole === "detetive" && myRoleIsPending && !detectiveGhostObservation && !isStoryReconNight;
   const needsAlignment =
     (myRole === "curupira" || myRole === "boitata") &&
     room.round === 1 &&
@@ -160,7 +168,8 @@ export function NightScreen({
   const hideNightTarget = delegadoPass || nightRolePass;
   let canSubmit = false;
   if (!anyPending) {
-    if (detectiveLocationTurn) canSubmit = Boolean(nightTarget);
+    if (isStoryReconNight) canSubmit = true;
+    else if (detectiveLocationTurn) canSubmit = true;
     else if (delegadoPass || nightRolePass) canSubmit = true;
     else if (myRole === "delegado" && nightAction === "jail") {
       canSubmit = !!nightTarget && (nightSpecialAction?.trim().length ?? 0) >= 10;
@@ -232,23 +241,42 @@ export function NightScreen({
     action: nightAction,
     suspicionOnly: suspicionPrimary && !myRoleIsPending,
     waiting: !myRoleIsPending && !suspicionPrimary,
+    reconNight: isStoryReconNight,
   });
 
   const submitNightAction = () => {
     if (anyPending || nightActionSent) return;
-    if (detectiveLocationTurn) {
-      if (!nightTarget) return;
+    if (isStoryReconNight) {
       void run(
         "submitNightAction",
         {
           roomCode,
           action: "visit_location",
           targetId: null,
-          specialAction: nightTarget,
+          specialAction: "reconhecimento",
         },
         "nightAction",
       )
         .then(() => setNightActionSent(true))
+        .catch(() => {});
+      return;
+    }
+    if (detectiveLocationTurn) {
+      const loc = pickRandomBucareLocation();
+      void run(
+        "submitNightAction",
+        {
+          roomCode,
+          action: "visit_location",
+          targetId: null,
+          specialAction: loc,
+        },
+        "nightAction",
+      )
+        .then(() => {
+          setNightActionSent(true);
+          setNightTarget(loc);
+        })
         .catch(() => {});
       return;
     }
@@ -432,12 +460,12 @@ export function NightScreen({
         <p className="eyebrow eyebrow-luar noite-eyebrow">A vila dorme</p>
       </div>
 
-      <p className="noite-prompt">{promptText}</p>
+      {!isStoryReconNight && !detectiveLocationTurn && promptText ? (
+        <p className="noite-prompt">{promptText}</p>
+      ) : null}
 
-      {detectiveLocationTurn && (
-        <DetectiveLocationNight
-          selected={(nightTarget as BucareLocation) || ""}
-          onSelect={(loc) => setNightTarget(loc)}
+      {isStoryReconNight && (
+        <DetectiveRecognitionNight
           onSubmit={submitNightAction}
           sent={nightActionSent}
           disabled={anyPending}
@@ -445,7 +473,17 @@ export function NightScreen({
         />
       )}
 
-      {myRoleIsPending && !detectiveLocationTurn && (
+      {detectiveLocationTurn && (
+        <DetectiveNightPassage
+          round={Number(room.round ?? 1)}
+          onContinue={submitNightAction}
+          sent={nightActionSent}
+          disabled={anyPending}
+          busy={busy("nightAction")}
+        />
+      )}
+
+      {myRoleIsPending && !detectiveLocationTurn && !isStoryReconNight && (
         <>
           {roleActionOptions.length > 1 && (
             <div className="noite-action-chips" role="group" aria-label="Ação">
@@ -555,7 +593,7 @@ export function NightScreen({
       )}
 
       <div className="noite-footer">
-        {showDetectiveGhostPanel ? null : detectiveLocationTurn ? null : myRoleIsPending ? (
+        {showDetectiveGhostPanel ? null : detectiveLocationTurn || isStoryReconNight ? null : myRoleIsPending ? (
           <button
             type="button"
             className={`btn-noite${nightActionSent ? " vote-sent" : ""}`}

@@ -1,0 +1,428 @@
+/* ── Modo Detetive — espera noturna (pós-reconhecimento / visita a local) ── */
+
+.detective-night-passage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: min(58vh, 440px);
+  width: 100%;
+  padding: 12px 16px 16px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.detective-night-passage__atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Partículas de poeira (Direção 4) ── */
+
+.detective-night-passage__particles {
+  position: absolute;
+  inset: 0;
+}
+
+.detective-night-passage__particle {
+  position: absolute;
+  width: var(--dust-size, 1.5px);
+  height: var(--dust-size, 1.5px);
+  border-radius: 50%;
+  background: #c9a96e;
+  opacity: var(--dust-opacity, 0.15);
+  animation: detective-dust-drift linear infinite;
+  will-change: transform;
+}
+
+@keyframes detective-dust-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(28px, -52px, 0);
+  }
+}
+
+/* ── Silhuetas do folclore (Direção 3) ── */
+
+.detective-night-passage__silhouette {
+  position: absolute;
+  top: 38%;
+  width: clamp(72px, 22vw, 120px);
+  height: auto;
+  opacity: 0;
+  filter: brightness(0);
+  pointer-events: none;
+  animation-duration: var(--silhouette-duration, 10s);
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.detective-night-passage__silhouette svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.detective-night-passage__silhouette--ltr {
+  left: 0;
+  animation-name: detective-silhouette-ltr;
+}
+
+.detective-night-passage__silhouette--rtl {
+  right: 0;
+  animation-name: detective-silhouette-rtl;
+}
+
+.detective-night-passage__silhouette--lobisomem {
+  top: calc(42% + var(--silhouette-y, -20px));
+}
+
+.detective-night-passage__silhouette--saci {
+  top: calc(58% + var(--silhouette-y, 30px));
+}
+
+.detective-night-passage__silhouette--saci svg {
+  animation: detective-saci-bounce var(--silhouette-duration, 8s) ease-in-out infinite;
+}
+
+.detective-night-passage__silhouette--iara {
+  top: calc(72% + var(--silhouette-y, 60px));
+  width: clamp(100px, 30vw, 160px);
+}
+
+.detective-night-passage__silhouette--mula {
+  top: calc(52% + var(--silhouette-y, 10px));
+  width: clamp(100px, 32vw, 180px);
+}
+
+@keyframes detective-silhouette-ltr {
+  0% {
+    transform: translateX(-120vw) translateY(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.12;
+  }
+  50% {
+    transform: translateX(0) translateY(calc(var(--silhouette-y, 0px) + 6px));
+    opacity: 0.1;
+  }
+  94% {
+    opacity: 0.12;
+  }
+  100% {
+    transform: translateX(120vw) translateY(var(--silhouette-y, 0));
+    opacity: 0;
+  }
+}
+
+@keyframes detective-silhouette-rtl {
+  0% {
+    transform: translateX(120vw) translateY(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.12;
+  }
+  50% {
+    transform: translateX(0) translateY(calc(var(--silhouette-y, 0px) - 8px));
+    opacity: 0.1;
+  }
+  94% {
+    opacity: 0.12;
+  }
+  100% {
+    transform: translateX(-120vw) translateY(var(--silhouette-y, 0));
+    opacity: 0;
+  }
+}
+
+@keyframes detective-saci-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* ── Conteúdo (lua, texto, CTA) ── */
+
+.detective-night-passage__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.detective-night-passage__celestial {
+  position: relative;
+  width: 100%;
+  height: 88px;
+  margin-bottom: 4px;
+}
+
+.detective-night-passage__moon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(52px, 14vw, 64px);
+  line-height: 1;
+  color: #c8d4e8;
+  opacity: 0;
+  animation:
+    detective-moon-in 600ms ease-out 400ms forwards,
+    moonPulse 4s ease-in-out 1s infinite;
+}
+
+.detective-night-passage--animate-in .detective-night-passage__moon {
+  animation:
+    detective-moon-in 600ms ease-out 400ms forwards,
+    moonPulse 4s ease-in-out 1s infinite;
+}
+
+@keyframes detective-moon-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.moon,
+.detective-night-passage__moon {
+  filter: drop-shadow(0 0 12px rgba(201, 169, 110, 0.3))
+    drop-shadow(0 0 40px rgba(201, 169, 110, 0.1));
+}
+
+@keyframes moonPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 12px rgba(201, 169, 110, 0.3))
+      drop-shadow(0 0 40px rgba(201, 169, 110, 0.1));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(201, 169, 110, 0.4))
+      drop-shadow(0 0 60px rgba(201, 169, 110, 0.15));
+  }
+}
+
+/* ── Estrelas ── */
+
+.detective-night-passage__star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  --star-opacity: 0.5;
+  animation:
+    detective-star-in 400ms ease-out forwards,
+    detective-twinkle ease-in-out infinite;
+}
+
+.detective-night-passage--animate-in .detective-night-passage__star {
+  animation:
+    detective-star-in 400ms ease-out forwards,
+    detective-twinkle ease-in-out infinite;
+}
+
+@keyframes detective-star-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--star-opacity);
+  }
+}
+
+@keyframes detective-twinkle {
+  0%,
+  100% {
+    opacity: var(--star-opacity);
+  }
+  50% {
+    opacity: calc(var(--star-opacity) * 0.3);
+  }
+}
+
+/* ── Texto e CTA (entrada sequencial) ── */
+
+.detective-night-passage__lead {
+  margin: 0;
+  max-width: 320px;
+  font-family: var(--ff-serif);
+  font-size: 1.05rem;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--texto-claro);
+}
+
+.detective-night-passage__lead-line {
+  display: inline;
+}
+
+.detective-night-passage__word {
+  display: inline-block;
+  opacity: 0;
+}
+
+.detective-night-passage--animate-in .detective-night-passage__word {
+  animation: detective-word-in 280ms ease-out forwards;
+}
+
+@keyframes detective-word-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.detective-night-passage__hint {
+  margin: 0;
+  max-width: 300px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  opacity: 0;
+}
+
+.detective-night-passage--animate-in .detective-night-passage__hint {
+  animation: detective-fade-up 500ms ease-out forwards;
+}
+
+.detective-night-passage__cta {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 8px;
+  opacity: 0;
+}
+
+.detective-night-passage--animate-in .detective-night-passage__cta {
+  animation: detective-fade-up 500ms ease-out forwards;
+}
+
+@keyframes detective-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Mobile: partículas e silhuetas mais sutis ── */
+
+@media (max-width: 640px) {
+  .detective-night-passage__silhouette--ltr,
+  .detective-night-passage__silhouette--rtl {
+    animation-name: detective-silhouette-ltr-mobile;
+  }
+
+  .detective-night-passage__silhouette--rtl {
+    animation-name: detective-silhouette-rtl-mobile;
+  }
+}
+
+@keyframes detective-silhouette-ltr-mobile {
+  0% {
+    transform: translateX(-120vw) translateY(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.06;
+  }
+  94% {
+    opacity: 0.06;
+  }
+  100% {
+    transform: translateX(120vw) translateY(var(--silhouette-y, 0));
+    opacity: 0;
+  }
+}
+
+@keyframes detective-silhouette-rtl-mobile {
+  0% {
+    transform: translateX(120vw) translateY(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.06;
+  }
+  94% {
+    opacity: 0.06;
+  }
+  100% {
+    transform: translateX(-120vw) translateY(var(--silhouette-y, 0));
+    opacity: 0;
+  }
+}
+
+/* ── prefers-reduced-motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .detective-night-passage__particle,
+  .detective-night-passage__silhouette,
+  .detective-night-passage__star {
+    display: none;
+  }
+
+  .detective-night-passage__moon {
+    opacity: 1;
+    animation: moonPulseReduced 8s ease-in-out infinite;
+  }
+
+  .detective-night-passage__word,
+  .detective-night-passage__hint,
+  .detective-night-passage__cta {
+    opacity: 1;
+    animation: none !important;
+    transform: none;
+  }
+}
+
+@keyframes moonPulseReduced {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(201, 169, 110, 0.2))
+      drop-shadow(0 0 24px rgba(201, 169, 110, 0.08));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(201, 169, 110, 0.28))
+      drop-shadow(0 0 36px rgba(201, 169, 110, 0.1));
+  }
+}
+
+/* Hide redundant footer when detective flow owns the CTA */
+.screen--noite:has(.detective-location-night) .noite-footer,
+.screen--noite:has(.detective-night-passage) .noite-footer,
+.screen--noite:has(.detective-recognition-night) .noite-footer {
+  display: none;
+}
+
+.screen--noite:has(.detective-recognition-night) .noite-alvos {
+  display: none;
+}
+
+.screen--noite:has(.detective-night-passage) .noite-hero,
+.screen--noite:has(.detective-night-passage) .noite-prompt {
+  display: none;
+}

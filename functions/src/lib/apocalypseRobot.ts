@@ -69,6 +69,67 @@ export async function markApocalypseRoboIfNeeded(
   return true;
 }
 
+/**
+ * Modo Detetive: sem humanos vivos na mesa (detetive eliminado/expulso, só bots).
+ * Encerra com Apocalipse Robô — sem dia de observação intermediário.
+ */
+export async function endSoloApocalypseRoboGame(roomCode: string, round: number): Promise<boolean> {
+  const roomRef = db.collection("rooms").doc(roomCode);
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.data() ?? {};
+  if (room.soloMode !== true) return false;
+  if (room.status === "ended") return true;
+
+  const players = await loadPlayers(roomCode);
+  if (!isApocalypseRobo(players)) return false;
+
+  const secrets = await loadSecrets(roomCode);
+  const revealedRoles: Record<string, string> = {};
+  for (const p of players) {
+    const r = secrets[p.id]?.role;
+    if (r) revealedRoles[p.id] = r;
+  }
+
+  const endBatch = db.batch();
+  endBatch.update(roomRef, {
+    status: "ended",
+    phase: "ended",
+    winner: "bots",
+    votingOpen: false,
+    pendingNightStart: false,
+    pendingNightRound: FieldValue.delete(),
+    apocalipseRoboDetected: true,
+    apocalipseRoboPendingDay: false,
+    soloGamePendingEnd: false,
+    soloGameEnded: true,
+    detectiveGhostObservation: false,
+    detectivePhase: FieldValue.delete(),
+    revealedRoles,
+    detectiveGuesses: null,
+    detectiveScore: null,
+    collectiveEndKind: FieldValue.delete(),
+  });
+
+  endBatch.set(roomRef.collection("publicLogEntries").doc(), {
+    round,
+    type: "apocalipse_robo",
+    message: APOCALYPSE_ROBO_INTERSTITIAL_PT,
+    timestamp: Date.now(),
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  endBatch.set(roomRef.collection("publicLogEntries").doc(), {
+    round,
+    type: "chronicle_end",
+    message: APOCALYPSE_ROBOT_CHRONICLE_PT,
+    timestamp: Date.now(),
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  await endBatch.commit();
+  return true;
+}
+
 /** Encerra a partida após o dia de observação do Apocalipse Robô. */
 export async function completeApocalypseRoboEnd(roomCode: string, round: number): Promise<boolean> {
   const roomRef = db.collection("rooms").doc(roomCode);

@@ -4,7 +4,7 @@ import { ROLE_DISPLAY } from "./roleStories.js";
 const INDIVIDUAL_WIN_COPY: Record<string, string> = {
   mula_padre: "A maldição encontrou o Padre — vitória da Mula.",
   iara_delegado: "O Delegado foi levado pelas águas — vitória da Iara.",
-  lobisomem_survived_r4: "Quatro luas e a fera ainda de pé — vitória do Lobisomem.",
+  lobisomem_survived_r4: "Quatro luas. Era tudo que a fera precisava — vitória individual do Lobisomem.",
   boto_all_moradores: "Não sobrou coração de morador sem encanto — vitória do Boto.",
   padre_all_moradores: "A fé cobriu todo morador vivo — vitória do Padre.",
   cangaceiro_iara: "O tiro encontrou a Iara — vitória do Cangaceiro.",

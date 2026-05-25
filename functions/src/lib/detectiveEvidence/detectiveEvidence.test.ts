@@ -46,6 +46,16 @@ describe("speakerIdsFromChatDocs", () => {
     assert.ok(spoke.has("bot-b"));
   });
 
+  it("silencio_suspeito: day round matches votesRound (not prior day)", () => {
+    const docs = [
+      mockDoc({ votesRound: 1, playerId: "bot-a", text: "Falei no dia 1." }),
+    ];
+    const spoke = speakerIdsFromChatDocs(docs, 1);
+    assert.ok(spoke.has("bot-a"));
+    const spokeWrong = speakerIdsFromChatDocs(docs, 0);
+    assert.equal(spokeWrong.size, 0);
+  });
+
   it("silencio_suspeito: only bots with zero chat in round are silent", () => {
     const candidateBotIds = ["bot-a", "bot-b", "bot-c"];
     const docs = [

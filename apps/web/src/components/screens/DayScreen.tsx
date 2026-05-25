@@ -242,10 +242,10 @@ export function DayScreen({
   const apocalypseObservation = room.apocalipseRoboPendingDay === true;
   const detectiveGhostObservation = isDetectiveGhostObservation(room);
   const spectatorObservation = apocalypseObservation || detectiveGhostObservation;
+  const isSoloHuman = Boolean(room.soloMode && myPlayer && !myPlayer.isBot);
+
   const votePending = canVote && room.votingOpen === true && !hasVoted && !spectatorObservation;
   const votingOpen = room.votingOpen === true;
-
-  const isSoloHuman = Boolean(room.soloMode && myPlayer && !myPlayer.isBot);
 
   const showApocalypsePanel = apocalypseObservation && myPlayer && !myPlayer.isBot;
   const showDetectiveGhostPanel =
@@ -260,6 +260,22 @@ export function DayScreen({
     !spectatorObservation &&
     (!canVote || hasVoted) &&
     (allVotesIn || allOthersVotedIn);
+
+  useEffect(() => {
+    if (!isSoloHuman || room.votingOpen !== true || spectatorObservation) return;
+    if (!hasVoted || !allOthersVotedIn || anyPending) return;
+    void run("soloTryCloseDay", { roomCode }, "soloClose").catch(() => {});
+  }, [
+    isSoloHuman,
+    room.votingOpen,
+    spectatorObservation,
+    hasVoted,
+    allOthersVotedIn,
+    anyPending,
+    roomCode,
+    run,
+  ]);
+
   const showHostVotingControls =
     isHost &&
     !room.soloMode &&
@@ -348,10 +364,53 @@ export function DayScreen({
           myPlayer={myPlayer}
           currentRound={currentRound}
           revealedRoles={room.revealedRoles}
+          chat={chat}
+          dawnHadDeath={roundFolhetim.manchete === "UM MORTO NO AÇUDE"}
+          run={run}
+          busy={busy}
         />
       )}
 
       <div className="dia-scroll">
+      {soloShowEncerrarDia && (
+        <section className="dia-solo-apurar" aria-label="Encerrar votação">
+          <button
+            type="button"
+            className="btn-dia dia-solo-apurar__btn"
+            disabled={anyPending}
+            onClick={() => void run("advanceDay", { roomCode }, "advanceDay").catch(() => {})}
+          >
+            <span className="btn-with-spinner">
+              {busy("advanceDay") || busy("soloClose")
+                ? "aguarda…"
+                : allVotesIn
+                  ? "Apurar votos →"
+                  : "Encerrar dia →"}
+              <BtnSpinner show={busy("advanceDay") || busy("soloClose")} />
+            </span>
+          </button>
+        </section>
+      )}
+
+      {(isHost || isSoloHuman) &&
+        room.pendingNightStart &&
+        !hasPendingSaciGorro(room) &&
+        !room.pendingBrasChoice && (
+          <section className="dia-solo-apurar" aria-label="Iniciar a noite">
+            <button
+              type="button"
+              className="btn-transicao dia-solo-apurar__btn"
+              disabled={anyPending}
+              onClick={() => void run("startNight", { roomCode }, "startNight").catch(() => {})}
+            >
+              <span className="btn-with-spinner">
+                {busy("startNight") ? "recolhendo…" : "Toque de recolher →"}
+                <BtnSpinner show={busy("startNight")} />
+              </span>
+            </button>
+          </section>
+        )}
+
       <DayStages stage={dayStage} onStage={setDayStage} votePending={votePending} />
 
       {isHost && !room.soloMode && votingOpen && !spectatorObservation && (
@@ -603,12 +662,16 @@ export function DayScreen({
           </button>
         )}
 
-        {votingOpen && hasVoted && !isHost && !spectatorObservation && (
+        {votingOpen && hasVoted && !isHost && !isSoloHuman && !spectatorObservation && (
           <p className="dia-footer__voted muted">
             {allVotesIn
               ? "Seu voto foi enviado. Aguardando o anfitrião encerrar a votação."
               : "Seu voto foi enviado."}
           </p>
+        )}
+
+        {votingOpen && hasVoted && isSoloHuman && !soloShowEncerrarDia && !spectatorObservation && (
+          <p className="dia-footer__voted muted">Seu voto foi enviado. Aguardando os demais…</p>
         )}
 
         {room.votingOpen === true && canVote && dayStage === 2 && !spectatorObservation && (
@@ -724,19 +787,22 @@ export function DayScreen({
           </>
         )}
 
-        {isHost && room.pendingNightStart && !hasPendingSaciGorro(room) && !room.pendingBrasChoice && (
-          <button
-            type="button"
-            className="btn-transicao"
-            disabled={anyPending}
-            onClick={() => void run("startNight", { roomCode }, "startNight").catch(() => {})}
-          >
-            <span className="btn-with-spinner">
-              {busy("startNight") ? "recolhendo…" : "Toque de recolher →"}
-              <BtnSpinner show={busy("startNight")} />
-            </span>
-          </button>
-        )}
+        {(isHost || isSoloHuman) &&
+          room.pendingNightStart &&
+          !hasPendingSaciGorro(room) &&
+          !room.pendingBrasChoice && (
+            <button
+              type="button"
+              className="btn-transicao"
+              disabled={anyPending}
+              onClick={() => void run("startNight", { roomCode }, "startNight").catch(() => {})}
+            >
+              <span className="btn-with-spinner">
+                {busy("startNight") ? "recolhendo…" : "Toque de recolher →"}
+                <BtnSpinner show={busy("startNight")} />
+              </span>
+            </button>
+          )}
       </footer>
 
       {dayStage === 1 && canChat && (

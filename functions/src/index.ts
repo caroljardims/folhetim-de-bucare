@@ -14,6 +14,8 @@ export {
 
 export {
   submitDetectiveGuesses,
+  syncDetectiveDayEvidence,
+  triggerDetectiveEndGameCallable,
   completeDetectiveGhostObservation,
   completeDetectiveEndFlow,
 } from "./handlers/detective.js";

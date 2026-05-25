@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FolhetimEdition } from "../FolhetimEdition.js";
 import type { ChatMessage, PlayerDoc, PublicLogEntry, RoomDoc } from "../../types.js";
 import { buildAnoitecerFolhetim, filterAnoitecerDayOutcomes } from "../../lib/anoitecerContent.js";
+import { findLobisomemObjectiveR4Folhetim } from "../../lib/amanhecerContent.js";
 
 export type AnoitecerScreenProps = {
   room: RoomDoc;
@@ -40,6 +41,11 @@ export function AnoitecerScreen({
     [dayOutcomes, savedDayChat, prevDayVotes, players],
   );
 
+  const lobisomemObjectiveFolhetim = useMemo(
+    () => findLobisomemObjectiveR4Folhetim(publicLog, round),
+    [publicLog, round],
+  );
+
   const editionLabel = `N.º ${String((prevRound - 1) * 2 + 2).padStart(2, "0")}`;
 
   return (
@@ -50,13 +56,24 @@ export function AnoitecerScreen({
         <p className="eyebrow anoitecer-chrome__tagline">A praça fechou as portas</p>
       </header>
 
-      <FolhetimEdition
-        round={prevRound}
-        folhetim={folhetim}
-        lead="— edição do anoitecer —"
-        editionLabel={editionLabel}
-        ariaLabel="Folhetim de Bucaré — edição do anoitecer"
-      />
+      {lobisomemObjectiveFolhetim ? (
+        <FolhetimEdition
+          round={round}
+          folhetim={lobisomemObjectiveFolhetim}
+          lead="— cordel da quarta lua —"
+          editionLabel="Extra"
+          ariaLabel="Folhetim de Bucaré — objetivo do Lobisomem"
+          className="folhetim--lobisomem-r4"
+        />
+      ) : (
+        <FolhetimEdition
+          round={prevRound}
+          folhetim={folhetim}
+          lead="— edição do anoitecer —"
+          editionLabel={editionLabel}
+          ariaLabel="Folhetim de Bucaré — edição do anoitecer"
+        />
+      )}
 
       <footer className="amanhecer-footer">
         <button

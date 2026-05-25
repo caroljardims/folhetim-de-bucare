@@ -3,15 +3,16 @@ import { EndScreen, type EndScreenProps } from "../screens/EndScreen.js";
 import { FinalEditionNav } from "../screens/FinalEditionNav.js";
 import {
   activeSoloEndSteps,
+  initialSoloEndStep,
   nextSoloEndStep,
   prevSoloEndStep,
   readSoloEndStep,
-  shouldSkipAccusation,
-  soloEndStepIndex,
+  scorePending,
+  soloEndDisplayProgress,
   writeSoloEndStep,
   type SoloEndStep,
 } from "../../lib/soloEndSequence.js";
-import { readDetectiveTheories } from "../../lib/detectiveTheories.js";
+import { detectiveGuessesFromTheories } from "../../lib/detectiveTheories.js";
 import type { PlayerDoc, RoomDoc } from "../../types.js";
 
 const DetectiveEndFlowLazy = lazy(() =>
@@ -40,54 +41,53 @@ export function SoloDetectiveEndOrchestrator({
   onChangeMode,
   ...endScreenProps
 }: OrchestratorProps) {
-  const steps = useMemo(() => activeSoloEndSteps(room), [room.detectiveEliminatedAt]);
-  const [soloEndStep, setSoloEndStep] = useState<SoloEndStep>(() => {
-    const stored = readSoloEndStep(roomCode);
-    if (stored && steps.includes(stored)) return stored;
-    return "city_conclusion";
-  });
-  const autoSubmitRef = useRef(false);
+  const steps = useMemo(() => activeSoloEndSteps(room), [room]);
+  const [soloEndStep, setSoloEndStep] = useState<SoloEndStep>(() =>
+    initialSoloEndStep(room, steps, readSoloEndStep(roomCode, steps)),
+  );
+  const autoScoreRef = useRef(false);
 
   useEffect(() => {
     writeSoloEndStep(roomCode, soloEndStep);
   }, [roomCode, soloEndStep]);
 
-  const stepIndex = soloEndStepIndex(soloEndStep, steps);
-  const editionProgress = { current: stepIndex + 1, total: steps.length };
-
-  const goNext = useCallback(() => {
-    const next = nextSoloEndStep(soloEndStep, steps);
-    if (next) setSoloEndStep(next);
-  }, [soloEndStep, steps]);
-
-  const goPrev = useCallback(() => {
-    const prev = prevSoloEndStep(soloEndStep, steps);
-    if (prev) setSoloEndStep(prev);
-  }, [soloEndStep, steps]);
-
   const bots = useMemo(() => players.filter((p) => p.isBot && p.id), [players]);
+  const botIds = useMemo(() => bots.map((b) => b.id!).filter(Boolean), [bots]);
 
   useEffect(() => {
-    if (soloEndStep !== "revelation") return;
-    if (!shouldSkipAccusation(room)) return;
-    if (room.detectiveScore) return;
-    if (autoSubmitRef.current) return;
-    autoSubmitRef.current = true;
-    const theories = readDetectiveTheories(roomCode);
-    const guesses: Record<string, string> = {};
-    for (const b of bots) {
-      guesses[b.id!] = theories[b.id!] ?? "unknown";
-    }
+    if (!scorePending(room)) return;
+    if (autoScoreRef.current) return;
+    if (botIds.length !== 6) return;
+    autoScoreRef.current = true;
+    const guesses = detectiveGuessesFromTheories(roomCode, botIds);
     void run("submitDetectiveGuesses", { roomCode, guesses }, "detectiveGuesses").catch(() => {
-      autoSubmitRef.current = false;
+      autoScoreRef.current = false;
     });
-  }, [soloEndStep, room.detectiveScore, room.detectiveEliminatedAt, roomCode, bots, run, room]);
+  }, [room.soloMode, room.detectiveScore, roomCode, botIds, run, room]);
 
-  const navSteps = new Set<SoloEndStep>(["city_conclusion", "chronicle"]);
-  const showOrchestratorNav = navSteps.has(soloEndStep);
-  const navPage = stepIndex;
-  const navNextDisabled =
-    soloEndStep === "chronicle" && shouldSkipAccusation(room) && busy("detectiveGuesses");
+  const displayProgress = soloEndDisplayProgress(soloEndStep, steps);
+  const navPage = displayProgress.current - 1;
+  const isLastStep = soloEndStep === "detective_score";
+  const waitingScore = scorePending(room);
+  const scoringBusy = busy("detectiveGuesses");
+
+  const goNext = useCallback(() => {
+    if (isLastStep) {
+      onPlayAgain();
+      return;
+    }
+    if (waitingScore) return;
+    const next = nextSoloEndStep(soloEndStep, steps);
+    if (next) setSoloEndStep(next);
+  }, [soloEndStep, steps, waitingScore, isLastStep, onPlayAgain]);
+
+  const goPrev = useCallback(() => {
+    if (waitingScore) return;
+    const prev = prevSoloEndStep(soloEndStep, steps);
+    if (prev) setSoloEndStep(prev);
+  }, [soloEndStep, steps, waitingScore]);
+
+  const nextDisabled = waitingScore;
 
   const endScreenBase = {
     ...endScreenProps,
@@ -95,62 +95,56 @@ export function SoloDetectiveEndOrchestrator({
     roomCode,
     players,
     hideInternalNav: true,
-    editionProgress,
+    editionProgress: undefined,
   };
+
+  const detectiveFlowSteps = new Set<SoloEndStep>(["revelation", "detective_score"]);
+
+  const stageContent =
+    waitingScore && scoringBusy ? (
+      <p className="solo-end-loading muted">Registrando suas teorias do caderno…</p>
+    ) : waitingScore ? (
+      <p className="solo-end-loading muted">Preparando o relatório…</p>
+    ) : soloEndStep === "city_conclusion" ? (
+      <EndScreen {...endScreenBase} endSlice="manchete" editionProgress={undefined} />
+    ) : soloEndStep === "chronicle" ? (
+      <EndScreen {...endScreenBase} endSlice="chronicle" hidePodium editionProgress={undefined} />
+    ) : detectiveFlowSteps.has(soloEndStep) ? (
+      <Suspense fallback={<p className="solo-end-loading muted">Abrindo o dossiê…</p>}>
+        <DetectiveEndFlowLazy
+          room={room}
+          roomCode={roomCode}
+          players={players}
+          playerId={endScreenProps.playerId}
+          myPlayer={players.find((p) => p.id === endScreenProps.playerId)}
+          run={run}
+          busy={busy}
+          isAnonymous={isAnonymous}
+          orchestrated
+          forcedPhase={soloEndStep === "revelation" ? "reveal" : "score"}
+          onPlayAgain={onPlayAgain}
+          onChangeMode={onChangeMode}
+          onChronicle={() => {}}
+        />
+      </Suspense>
+    ) : null;
 
   return (
     <div className="screen screen--fim screen--solo-end-orchestrator">
       <p className="fim-edition-label">
-        Edição final · {editionProgress.current}/{editionProgress.total}
+        Edição final · {displayProgress.current}/{displayProgress.total}
       </p>
 
-      {soloEndStep === "city_conclusion" && (
-        <EndScreen {...endScreenBase} endSlice="manchete" editionProgress={undefined} />
-      )}
+      <div className="solo-end-stage">{stageContent}</div>
 
-      {soloEndStep === "chronicle" && (
-        <EndScreen {...endScreenBase} endSlice="chronicle" hidePodium editionProgress={undefined} />
-      )}
-
-      {(soloEndStep === "accusation" ||
-        soloEndStep === "revelation" ||
-        soloEndStep === "detective_score") && (
-        <Suspense fallback={null}>
-          <DetectiveEndFlowLazy
-            room={room}
-            roomCode={roomCode}
-            players={players}
-            playerId={endScreenProps.playerId}
-            myPlayer={players.find((p) => p.id === endScreenProps.playerId)}
-            run={run}
-            busy={busy}
-            isAnonymous={isAnonymous}
-            orchestrated
-            forcedPhase={
-              soloEndStep === "accusation"
-                ? "accusation"
-                : soloEndStep === "revelation"
-                  ? "reveal"
-                  : "score"
-            }
-            onAccusationSubmitted={() => setSoloEndStep("revelation")}
-            onRevealComplete={() => setSoloEndStep("detective_score")}
-            onPlayAgain={onPlayAgain}
-            onChangeMode={onChangeMode}
-            onChronicle={() => setSoloEndStep("chronicle")}
-          />
-        </Suspense>
-      )}
-
-      {showOrchestratorNav && (
-        <FinalEditionNav
-          page={navPage}
-          pageCount={steps.length}
-          onPrev={goPrev}
-          onNext={goNext}
-          nextDisabled={navNextDisabled}
-        />
-      )}
+      <FinalEditionNav
+        page={navPage}
+        pageCount={steps.length}
+        onPrev={goPrev}
+        onNext={goNext}
+        nextDisabled={nextDisabled}
+        isLastStep={isLastStep}
+      />
     </div>
   );
 }

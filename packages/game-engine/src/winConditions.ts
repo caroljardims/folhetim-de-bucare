@@ -130,6 +130,11 @@ export function checkCollectiveWin(
 export const TIE_FOLKLORE_INTACT_MESSAGE_PT =
   "Os números se igualaram — mas o folclore ainda está intacto. Bucaré não pode descansar ainda. A noite volta.";
 
+/** Linha de empate folclore intacto — só na madrugada, não na praça. */
+export function isTieFolkloreIntactFolhetimMessage(message: string): boolean {
+  return String(message ?? "").trim() === TIE_FOLKLORE_INTACT_MESSAGE_PT;
+}
+
 /** Parágrafo explícito para o Folhetim / crônica ao encerrar por vitória coletiva. */
 export function collectiveWinChronicleMessagePt(detail: CollectiveWinDetail): string | null {
   if (!detail.winner || !detail.reason) return null;
