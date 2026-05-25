@@ -36,8 +36,10 @@ import { useAllSecrets } from "./hooks/useAllSecrets.js";
 import { isLocalDebug } from "./debug/isLocalDebug.js";
 import { DEBUG_ROLE_LABELS } from "./debug/roleOptions.js";
 import { NIGHT_ROLE_ACTION_SECONDS } from "./lib/nightTurnConstants.js";
+import { LOCATION_LABEL_PT, pickRandomBucareLocation } from "./lib/detectiveLocations.js";
 import { mapCallableError } from "./lib/callableErrors.js";
-import type { PlayerDoc, View } from "./types.js";
+import type { PlayerDoc, SoloModeDifficulty, View } from "./types.js";
+import { navigateDetectiveGuide } from "./lib/detectiveRoute.js";
 import { BtnSpinner } from "./components/BtnSpinner.js";
 import { EndScreen } from "./components/screens/EndScreen.js";
 import { AmanhecerScreen } from "./components/screens/AmanhecerScreen.js";
@@ -70,6 +72,12 @@ const LS_GLYPH = "folclore_glyph";
 
 
 const DebugIntroChromeLazy = lazy(() => import("./debug/DebugIntroChrome.js"));
+
+const DetectiveEndFlowLazy = lazy(() =>
+  import("./components/detective/DetectiveEndFlow.js").then((m) => ({
+    default: m.DetectiveEndFlow,
+  })),
+);
 
 export type AppProps = {
   masterBootstrap?: { playerId: string; roomCode: string | null };
@@ -188,6 +196,8 @@ export function App({ masterBootstrap }: AppProps = {}) {
 
   // Entry flow
   const [view, setView] = useState<View>("intro");
+  const [soloModeDifficulty, setSoloModeDifficulty] = useState<SoloModeDifficulty | null>(null);
+  const [detectiveName, setDetectiveName] = useState("");
   const [glyph, setGlyph] = useState(() => localStorage.getItem(LS_GLYPH) ?? "☽");
   const [joinCodeArr, setJoinCodeArr] = useState(["", "", "", ""]);
   const codeInputRefs = useRef<Array<HTMLInputElement | null>>([null, null, null, null]);
@@ -406,6 +416,41 @@ export function App({ masterBootstrap }: AppProps = {}) {
   ]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!roomCode) return;
+    if (room?.status !== "night" || !room.soloMode || myRole !== "detetive") return;
+    if (!room.nightPendingRoles?.includes("detetive")) return;
+    if (nightActionSent) return;
+
+    const t = window.setTimeout(() => {
+      const loc = pickRandomBucareLocation();
+      void run(
+        "submitNightAction",
+        { roomCode, action: "visit_location", targetId: null, specialAction: loc },
+        "nightAction",
+      )
+        .then(() => {
+          setNightActionSent(true);
+          setNightTarget(loc);
+          setNightToast(`Tempo esgotado. Você rondou ${LOCATION_LABEL_PT[loc]} ao acaso.`);
+          window.setTimeout(() => setNightToast(null), 6000);
+        })
+        .catch(() => {});
+    }, NIGHT_ROLE_ACTION_SECONDS * 1000);
+
+    return () => window.clearTimeout(t);
+  }, [
+    room?.status,
+    room?.soloMode,
+    room?.round,
+    room?.nightPendingRoles,
+    myRole,
+    nightActionSent,
+    roomCode,
+    run,
+  ]);
+
+  useEffect(() => {
     if (room?.status !== "night") setNightToast(null);
   }, [room?.status]);
 
@@ -475,10 +520,34 @@ export function App({ masterBootstrap }: AppProps = {}) {
   const goIntro = () => {
     setView("intro");
     setJoinCodeArr(["", "", "", ""]);
+    setSoloModeDifficulty(null);
+    setDetectiveName("");
     setErr(null);
     setAuthModalOpen(false);
     postAuthTarget.current = null;
     setUserMenuOpen(false);
+  };
+
+  const startSoloDetective = async () => {
+    if (!soloModeDifficulty) return;
+    const dn = detectiveName.trim() || "Detetive";
+    try {
+      const r = await run(
+        "startSoloDetectiveGame",
+        { detectiveName: dn, soloModeDifficulty },
+        "startSoloDetective",
+      );
+      setAmHost(true);
+      const code = String(r.roomCode ?? "");
+      const pid = String(r.playerId ?? "");
+      setRoomCode(code);
+      setPlayerId(pid);
+      localStorage.setItem(LS_ROOM, code);
+      localStorage.setItem(LS_PLAYER, pid);
+      localStorage.removeItem(LS_GLYPH);
+    } catch {
+      setAmHost(false);
+    }
   };
 
   const handleAuthSuccess = useCallback(() => {
@@ -500,13 +569,14 @@ export function App({ masterBootstrap }: AppProps = {}) {
   }, []);
 
   const beginGuestEntry = useCallback(
-    async (target: "create" | "join") => {
+    async (target: "create" | "join" | "detective") => {
       setErr(null);
       setPendingAction(`guestAuth-${target}`);
       try {
         await ensureGuestAuth(auth);
         if (target === "create") setView("create");
-        else setView("join");
+        else if (target === "join") setView("join");
+        else setView("detectiveMode");
       } catch {
         setErr("Não foi possível conectar. Tente novamente.");
       } finally {
@@ -648,7 +718,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
   }, [myRole, players, playerId, room?.round]);
 
   useEffect(() => {
-    setNightAction(roleActionOptions[0]?.value ?? "eliminate");
+    setNightAction(myRole === "detetive" ? "visit_location" : (roleActionOptions[0]?.value ?? "eliminate"));
     setNightTarget("");
     setNightSpecialAction(null);
     setNightActionSent(false);
@@ -893,6 +963,21 @@ export function App({ masterBootstrap }: AppProps = {}) {
                   </div>
                   <span className="btn-arrow" aria-hidden>→</span>
                 </button>
+                <button
+                  type="button"
+                  className="jornal-cta--detetive ghost-btn"
+                  disabled={busy("guestAuth-detective")}
+                  onClick={() => void beginGuestEntry("detective")}
+                >
+                  <div className="btn-stack">
+                    <span className="btn-title btn-title-row">
+                      {busy("guestAuth-detective") ? "conectando…" : "🔍 Modo Detetive"}
+                      <BtnSpinner show={busy("guestAuth-detective")} />
+                    </span>
+                    <span className="btn-sub">Descubra quem é quem em Bucaré</span>
+                  </div>
+                  <span className="btn-arrow" aria-hidden>→</span>
+                </button>
               </div>
 
               {/* Cordel — coluna esquerda no desktop */}
@@ -932,6 +1017,105 @@ export function App({ masterBootstrap }: AppProps = {}) {
             </footer>
           </div>
           {debugLandingChrome}
+          {authModalElement}
+        </>
+      );
+    }
+
+    if (view === "detectiveMode") {
+      return (
+        <>
+          <div className="page page--detective-setup">
+            <div className="top-bar">
+              <button type="button" className="back-link" onClick={goIntro}>
+                ← voltar
+              </button>
+              <span className="session-label">modo detetive</span>
+              <span className="top-bar-spacer" />
+            </div>
+            <h2 className="h-display">Como você quer jogar?</h2>
+            <div className="detective-mode-cards">
+              <button
+                type="button"
+                className="detective-mode-card primary-btn"
+                onClick={() => {
+                  setSoloModeDifficulty("story");
+                  setDetectiveName(user?.displayName?.trim() ?? "");
+                  setView("detectiveName");
+                }}
+              >
+                <span className="btn-title">📖 Modo História</span>
+                <span className="btn-sub">O caderno se preenche sozinho. Foque na narrativa.</span>
+              </button>
+              <button
+                type="button"
+                className="detective-mode-card ghost-btn"
+                onClick={() => {
+                  setSoloModeDifficulty("investigation");
+                  setDetectiveName(user?.displayName?.trim() ?? "");
+                  setView("detectiveName");
+                }}
+              >
+                <span className="btn-title">🔍 Modo Investigação</span>
+                <span className="btn-sub">Você toma suas próprias notas. Sem ajuda. Sem rede de segurança.</span>
+              </button>
+            </div>
+            <button type="button" className="detective-guide-link" onClick={() => navigateDetectiveGuide()}>
+              O que é o Modo Detetive? →
+            </button>
+            {err && <p className="error">{err}</p>}
+          </div>
+          {authModalElement}
+        </>
+      );
+    }
+
+    if (view === "detectiveName") {
+      return (
+        <>
+          <div className="page page--detective-setup">
+            <div className="top-bar">
+              <button
+                type="button"
+                className="back-link"
+                onClick={() => {
+                  setView("detectiveMode");
+                  setErr(null);
+                }}
+              >
+                ← voltar
+              </button>
+              <span className="session-label">
+                {soloModeDifficulty === "story" ? "modo história" : "modo investigação"}
+              </span>
+              <span className="top-bar-spacer" />
+            </div>
+            <h2 className="h-display">Quem investiga Bucaré esta noite?</h2>
+            <p className="copy-muted">Este é o nome que os habitantes verão.</p>
+            <label className="field-label" htmlFor="detective-name">
+              Nome do detetive
+            </label>
+            <input
+              id="detective-name"
+              className="field-input"
+              placeholder="como quer ser chamado"
+              value={detectiveName}
+              onChange={(e) => setDetectiveName(e.target.value)}
+              maxLength={40}
+            />
+            {err && <p className="error">{err}</p>}
+            <button
+              type="button"
+              className="primary-btn"
+              disabled={anyPending || !detectiveName.trim() || !uid}
+              onClick={() => void startSoloDetective()}
+            >
+              <span className="btn-title btn-title-row">
+                {busy("startSoloDetective") ? "abrindo a cidade…" : "Começar investigação →"}
+                <BtnSpinner show={busy("startSoloDetective")} />
+              </span>
+            </button>
+          </div>
           {authModalElement}
         </>
       );
@@ -1436,6 +1620,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
       {inNightPhase && room && (
         <NightScreen
           room={room}
+          soloMode={Boolean(room.soloMode)}
           roomCode={roomCode}
           players={players}
           playerId={playerId}
@@ -1508,7 +1693,7 @@ export function App({ masterBootstrap }: AppProps = {}) {
           setLoreOpen={setLoreOpen}
           loreSheetFolhetoOpen={loreSheetFolhetoOpen}
           setLoreSheetFolhetoOpen={setLoreSheetFolhetoOpen}
-          selfGlyph={glyph}
+          selfGlyph={room?.soloMode ? "🔍" : glyph}
           formatPlayerName={formatDebugPlayerOpt}
           run={run}
           busy={busy}
@@ -1586,7 +1771,32 @@ export function App({ masterBootstrap }: AppProps = {}) {
         </div>
       )}
 
-      {room?.status === "ended" && room && (
+      {room?.status === "ended" && room?.soloMode && room.detectivePhase !== "done" && (
+        <Suspense fallback={null}>
+          <DetectiveEndFlowLazy
+            room={room}
+            roomCode={roomCode}
+            players={players}
+            playerId={playerId}
+            myPlayer={players.find((p) => p.id === playerId)}
+            run={run}
+            busy={busy}
+            onPlayAgain={() => {
+              leave();
+              setView("detectiveMode");
+              void beginGuestEntry("detective");
+            }}
+            onChangeMode={() => {
+              leave();
+              setView("detectiveMode");
+            }}
+            onChronicle={() => void run("completeDetectiveEndFlow", { roomCode }, "detectiveDone")}
+            isAnonymous={isAnonymousUser}
+          />
+        </Suspense>
+      )}
+
+      {room?.status === "ended" && room && (!room.soloMode || room.detectivePhase === "done") && (
         <EndScreen
           room={room}
           players={players}

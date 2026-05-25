@@ -16,7 +16,8 @@ export type RoleId =
   | "cartomante"
   | "coronel"
   | "padre"
-  | "aldeao";
+  | "aldeao"
+  | "detetive";
 
 export type Side = "criatura" | "neutro" | "morador";
 

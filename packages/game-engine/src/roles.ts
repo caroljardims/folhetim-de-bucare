@@ -18,7 +18,11 @@ export const ROLE_SIDE: Record<RoleId, Side> = {
   coronel: "morador",
   padre: "morador",
   aldeao: "morador",
+  detetive: "neutro",
 };
+
+/** Papéis exclusivos do Modo Detetive (solo); nunca entram em `buildResolvedRoles` multiplayer. */
+export const SOLO_MODE_ONLY_ROLES: RoleId[] = ["detetive"];
 
 export const CREATURE_ROLES: RoleId[] = [
   "lobisomem",
@@ -56,6 +60,19 @@ export function displayRoleName(role: RoleId): string {
     coronel: "Coronel",
     padre: "Padre",
     aldeao: "Aldeão",
+    detetive: "Detetive",
   };
   return map[role];
+}
+
+export function isSoloModeOnlyRole(role: RoleId): boolean {
+  return SOLO_MODE_ONLY_ROLES.includes(role);
+}
+
+/** Papéis sem ação na fila noturna (observadores). Detetive ronda em Modo Detetive. */
+export function hasNightAction(role: RoleId): boolean {
+  if (role === "aldeao" || role === "coronel" || role === "bras_cubas") {
+    return false;
+  }
+  return true;
 }

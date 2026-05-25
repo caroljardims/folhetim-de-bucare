@@ -20,6 +20,7 @@ export function DebugToolbar({ room, players, secrets }: Props) {
     Number(room.round ?? 1),
     Number(room.maxRounds ?? 0),
     Number(room.gameTablePlayerCount ?? players.length),
+    Number(room.criaturaRemovedCount ?? 0),
   );
 
   const roleLabel = (id: string) => {

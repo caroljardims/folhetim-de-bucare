@@ -60,7 +60,7 @@ export async function finalizeMvpLedgerIfNeeded(roomCode: string): Promise<void>
   const roomSnap = await roomRef.get();
   const room = roomSnap.data() ?? {};
   if (room.status !== "ended" || room.mvpLedgerApplied === true) return;
-  const skipPublicLedger = room.debug === true;
+  const skipPublicLedger = room.debug === true || room.soloMode === true;
 
   const winner = String(room.winner ?? "");
   const finalRound = Number(room.round ?? 1);

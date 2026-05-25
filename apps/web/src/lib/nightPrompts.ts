@@ -14,6 +14,10 @@ export function nightPrompt(
   if (opts.waiting && !opts.myTurn) {
     return "A vila dorme. Aguarde o amanhecer.";
   }
+  if (role === "detetive") {
+    if (opts.myTurn) return "Onde você vai investigar esta noite?";
+    return "A cidade dorme. Aguarde o amanhecer.";
+  }
   if (!opts.myTurn) {
     return "A vila dorme. Aguarde o amanhecer.";
   }

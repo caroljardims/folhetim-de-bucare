@@ -1,6 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { dealRoles, maxRoundsForPlayerCount } from "folclore-game-engine";
+import { dealRoles, dealSoloDetectiveRoles, maxRoundsForPlayerCount } from "folclore-game-engine";
+import type { SoloModeDifficulty } from "../lib/detectiveTypes.js";
 import {
   db,
   loadPlayers,
@@ -51,6 +52,7 @@ export const createRoom = onCall(async (req) => {
         geniInvestigatedTargets: [],
         votingOpen: false,
         mvpLedgerApplied: false,
+        criaturaRemovedCount: 0,
         createdAt: FieldValue.serverTimestamp(),
         ...(isDebug
           ? { debug: true, debugShowAllRoles: true }
@@ -135,6 +137,124 @@ export const joinRoom = onCall(async (req) => {
 });
 
 
+function parseSoloModeDifficulty(raw: unknown): SoloModeDifficulty {
+  const v = String(raw ?? "").trim();
+  if (v === "story" || v === "investigation") return v;
+  throw new HttpsError("invalid-argument", "Modo inválido (story | investigation).");
+}
+
+export const startSoloDetectiveGame = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const detectiveName = String(req.data?.detectiveName ?? "Detetive").slice(0, 40).trim() || "Detetive";
+  const soloModeDifficulty = parseSoloModeDifficulty(req.data?.soloModeDifficulty);
+
+  let code = randomCode();
+  let roomRef = db.collection("rooms").doc(code);
+  let created = false;
+  for (let att = 0; att < 10; att++) {
+    const snap = await roomRef.get();
+    if (!snap.exists) {
+      created = true;
+      break;
+    }
+    code = randomCode();
+    roomRef = db.collection("rooms").doc(code);
+  }
+  if (!created) throw new HttpsError("resource-exhausted", "Tente novamente.");
+
+  const humanPid = randomId();
+  const usedLower = new Set<string>([detectiveName.trim().toLowerCase()]);
+  const namePool = shuffleBotNamePool(Math.random);
+  const botIds: string[] = [];
+  const botNames: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    botIds.push(randomId());
+    botNames.push(nextUniqueBotName(usedLower, namePool));
+  }
+
+  let botRoles: Record<string, import("folclore-game-engine").RoleId>;
+  try {
+    botRoles = dealSoloDetectiveRoles(botIds, Math.random);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Não foi possível sortear os habitantes.";
+    throw new HttpsError("failed-precondition", msg);
+  }
+
+  const batch = db.batch();
+  batch.set(roomRef, {
+    code,
+    hostUid: uid,
+    hostPlayerId: humanPid,
+    memberUids: [uid],
+    status: "night",
+    phase: "night",
+    round: 1,
+    maxRounds: maxRoundsForPlayerCount(7),
+    spokespersonId: humanPid,
+    winner: null,
+    individualWins: [],
+    nightPhaseIndex: 0,
+    currentActorRole: null,
+    nightOrderRoles: [],
+    geniInvestigatedTargets: [],
+    votingOpen: false,
+    mvpLedgerApplied: false,
+    gameTablePlayerCount: 7,
+    soloMode: true,
+    soloModeDifficulty,
+    detectiveGuesses: null,
+    detectiveScore: null,
+    detectivePhase: null,
+    criaturaRemovedCount: 0,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  batch.set(roomRef.collection("players").doc(humanPid), {
+    id: humanPid,
+    uid,
+    name: detectiveName,
+    alive: true,
+    eliminated: false,
+    expelled: false,
+    isSpokesperson: true,
+    evidenceLog: [],
+    locationHistory: [],
+    manualNotes: {},
+  });
+  batch.set(roomRef.collection("secrets").doc(humanPid), { role: "detetive", side: "neutro" });
+
+  for (let i = 0; i < botIds.length; i++) {
+    const bid = botIds[i]!;
+    const role = botRoles[bid];
+    if (!role) throw new HttpsError("failed-precondition", "Sorteio inconsistente.");
+    batch.set(roomRef.collection("players").doc(bid), {
+      id: bid,
+      uid: `bot_${bid}`,
+      name: botNames[i]!,
+      alive: true,
+      eliminated: false,
+      expelled: false,
+      isSpokesperson: false,
+      isBot: true,
+      botKnowledge: emptyBotKnowledge(),
+    });
+    batch.set(roomRef.collection("secrets").doc(bid), { role, side: ROLE_SIDE[role] });
+  }
+
+  await batch.commit();
+  await ensurePlayerPrivateDoc(code, humanPid, uid);
+  try {
+    await startNightSequence(code, 1);
+    await processBotNightActions(code, 1);
+    await maybeFinalizeNight(code, 1);
+  } catch (e: unknown) {
+    console.error("startSoloDetectiveGame: pós-commit", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new HttpsError("failed-precondition", `Início da investigação falhou (${msg}).`);
+  }
+  return { roomCode: code, playerId: humanPid };
+});
+
 export const startGame = onCall(async (req) => {
   const uid = requireAuth(req);
   const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
@@ -218,6 +338,7 @@ export const startGame = onCall(async (req) => {
     geniInvestigatedTargets: [],
     nightPhaseIndex: 0,
     gameTablePlayerCount: players.length,
+    criaturaRemovedCount: 0,
     ...(players.length === 5
       ? { fiveTableMoradorIds: moradorIdsAtStart }
       : { fiveTableMoradorIds: FieldValue.delete() }),
@@ -403,6 +524,7 @@ export const restartGame = onCall(async (req) => {
       alignment: FieldValue.delete(),
       curupiraFiveMoradoresProtected: FieldValue.delete(),
       boitataFiveMoradoresInvestigated: FieldValue.delete(),
+      locationHistory: [],
       ...(Boolean(p.isBot) ? { botKnowledge: FieldValue.delete() } : {}),
     });
   }
@@ -433,6 +555,7 @@ export const restartGame = onCall(async (req) => {
     collectiveEndKind: FieldValue.delete(),
     fiveTableMoradorIds: FieldValue.delete(),
     voidedDayExpulsionRound: FieldValue.delete(),
+    criaturaRemovedCount: 0,
   });
 
   await batch.commit();

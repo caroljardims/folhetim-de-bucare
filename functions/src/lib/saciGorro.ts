@@ -15,6 +15,7 @@ import {
   brasToloRevealEndMessage,
   computeBrasAvailableRoles,
 } from "./brasExpulsion.js";
+import { criaturaRemovedIncrementPatch, isCriaturaRole } from "./criaturaRemovedCount.js";
 
 type LoadedPlayer = Awaited<ReturnType<typeof loadPlayers>>[number];
 type SecretsMap = Awaited<ReturnType<typeof loadSecrets>>;
@@ -163,6 +164,10 @@ async function processGorroExpulsion(
     timestamp: Date.now(),
     createdAt: FieldValue.serverTimestamp(),
   });
+
+  if (isCriaturaRole(role)) {
+    batch.update(roomRef, criaturaRemovedIncrementPatch(1));
+  }
 
   if (isBotBras) {
     const revealedRoles: Record<string, string> = {};

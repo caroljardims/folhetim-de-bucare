@@ -35,6 +35,12 @@ export async function ensureUserProfile(user: User): Promise<void> {
       premiumSince: null,
       stripeCustomerId: null,
       favorites: [],
+      detectiveGamesPlayed: 0,
+      detectiveBestScore: 0,
+      detectiveBestRank: null,
+      detectiveLastMode: null,
+      detectiveLegendCount: 0,
+      detectiveLegendNoNetCount: 0,
     });
     return;
   }

@@ -11,7 +11,29 @@ export type LoreRich = {
   sections: LoreSection[];
 };
 
-export type View = "intro" | "create" | "join" | "joinName";
+export type View = "intro" | "create" | "join" | "joinName" | "detectiveMode" | "detectiveName";
+
+export type SoloModeDifficulty = "story" | "investigation";
+
+export type DetectiveRank = "NOVATO" | "INVESTIGADOR" | "DETETIVE" | "LENDA";
+
+export type EvidenceWeight = "leve" | "moderado" | "forte";
+
+export type EvidenceEntry = {
+  id: string;
+  round: number;
+  type: string;
+  targetId: string;
+  description: string;
+  weight: EvidenceWeight;
+  createdAt?: number;
+};
+
+export type LocationHistoryEntry = {
+  round: number;
+  location: string;
+  result: "empty" | "all_present" | "all_absent" | "mixed";
+};
 
 export type RoomDoc = DocumentData & {
   status?: string;
@@ -73,6 +95,8 @@ export type RoomDoc = DocumentData & {
   geniInvestigatedTargets?: (string | GeniInvestigationRecord)[];
   /** Congelado em `startGame` (jogadores conectados ao iniciar). */
   gameTablePlayerCount?: number;
+  /** Criaturas eliminadas ou expulsas desde o início (empate 7+ no placar). */
+  criaturaRemovedCount?: number;
   /** Sala criada via modo debug (localhost). Exclui MVP / histórico público. */
   debug?: boolean;
   debugSlowMode?: boolean;
@@ -84,6 +108,18 @@ export type RoomDoc = DocumentData & {
   collectiveEndKind?: string;
   /** Só mesa de 5: ids de jogadores com papel de lado morador no início (objetivo Curupira/Boitatá). */
   fiveTableMoradorIds?: string[];
+  soloMode?: boolean;
+  soloModeDifficulty?: SoloModeDifficulty;
+  detectiveGuesses?: Record<string, string> | null;
+  detectiveScore?: {
+    correct: number;
+    total: number;
+    criaturaCorrect: number;
+    moradorCorrect: number;
+    rank: DetectiveRank;
+    calculatedAt?: unknown;
+  } | null;
+  detectivePhase?: "accusation" | "reveal" | "score" | "done" | null;
 };
 
 export type PlayerDoc = DocumentData & {
@@ -112,6 +148,9 @@ export type PlayerDoc = DocumentData & {
   /** Mesa de 5: moradores distintos já investigados (Boitatá). */
   boitataFiveMoradoresInvestigated?: string[];
   delegadoLastJailedId?: string | null;
+  evidenceLog?: EvidenceEntry[];
+  locationHistory?: LocationHistoryEntry[];
+  manualNotes?: Record<string, string>;
 };
 
 export type PublicLogEntry = { id: string; message?: string; round?: number; type?: string; roleName?: string };

@@ -1,5 +1,6 @@
 import type { BotContext, MessageType, Rng } from "./types.js";
 import { getCharacterConfig } from "./characterConfigs.js";
+import { applyCharacterTellPhrase } from "./characterTells.js";
 import { getExclusivePhrases } from "./exclusivePhrases.js";
 import { getGenericPhrases } from "./genericPhrases.js";
 
@@ -27,7 +28,7 @@ function phraseFromRaw(raw: string, type: MessageType, ctx: BotContext, rng: Rng
 
   const cfg = getCharacterConfig(ctx.role);
   if (cfg.postProcess) phrase = cfg.postProcess(phrase, ctx, rng);
-  return phrase;
+  return applyCharacterTellPhrase(phrase, ctx.role, ctx, rng);
 }
 
 function pickRawPhrase(type: MessageType, ctx: BotContext, rng: Rng): string {

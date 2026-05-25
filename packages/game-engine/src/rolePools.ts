@@ -268,6 +268,41 @@ export function buildResolvedRoles(n: number, rng: () => number): RoleId[] {
   throw new Error(`Composição ${n} jogadores inválida (mesa grande)`);
 }
 
+/** Remove um slot da composição de 7 jogadores para mesa solo (1 humano detetive + 6 bots). */
+function dropOneSlotForSoloDetective(roles7: RoleId[]): RoleId[] {
+  const idxAldeao = roles7.indexOf("aldeao");
+  if (idxAldeao >= 0) {
+    return roles7.filter((_, i) => i !== idxAldeao);
+  }
+  for (let i = 0; i < roles7.length; i++) {
+    const trial = roles7.filter((_, j) => j !== i);
+    if (trial.length === 6 && validateRoleComposition(trial)) return trial;
+  }
+  throw new Error("Não foi possível reduzir composição de 7 para 6 bots");
+}
+
+/**
+ * Sorteia 6 papéis de mesa de 7 jogadores para bots no Modo Detetive.
+ * O humano recebe `detetive` fora desta função.
+ */
+export function dealSoloDetectiveRoles(botPlayerIds: string[], rng: () => number): Record<string, RoleId> {
+  if (botPlayerIds.length !== 6) {
+    throw new Error(`Modo Detetive exige 6 bots, recebido ${botPlayerIds.length}`);
+  }
+  for (let attempt = 0; attempt < 500; attempt++) {
+    const roles7 = buildResolvedRoles(7, rng);
+    const roles6 = dropOneSlotForSoloDetective(roles7);
+    if (roles6.length !== 6 || !validateRoleComposition(roles6)) continue;
+    shuffleInPlace(roles6, rng);
+    const byPlayerId: Record<string, RoleId> = {};
+    botPlayerIds.forEach((id, i) => {
+      byPlayerId[id] = roles6[i]!;
+    });
+    return byPlayerId;
+  }
+  throw new Error("Não foi possível sortear papéis para Modo Detetive");
+}
+
 export function dealRoles(playerIds: string[], rng: () => number): DealResult {
   const n = playerIds.length;
   for (let attempt = 0; attempt < 500; attempt++) {

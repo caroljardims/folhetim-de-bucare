@@ -1,3 +1,4 @@
+import { isBucareLocation } from "./detectiveLocations.js";
 import type { NightActionInput, PlayerDawnState } from "./types.js";
 import type { RoleId } from "./types.js";
 
@@ -27,6 +28,19 @@ export function validateNightAction(
   }
   if (submission.role !== ctx.expectedRole) {
     return { ok: false, error: "Não é sua vez nesta fase." };
+  }
+  if (player.role === "detetive") {
+    if (submission.action !== "visit_location") {
+      return { ok: false, error: "Escolha um lugar em Bucaré para rondar." };
+    }
+    if (submission.targetId) {
+      return { ok: false, error: "A ronda não usa alvo de jogador." };
+    }
+    const loc = submission.specialAction?.trim() ?? "";
+    if (!isBucareLocation(loc)) {
+      return { ok: false, error: "Local inválido." };
+    }
+    return { ok: true };
   }
   if (player.role === "doutor" && submission.targetId && player.doctorLastTargetId === submission.targetId) {
     return { ok: false, error: "Doutor não pode salvar o mesmo alvo em noites consecutivas." };

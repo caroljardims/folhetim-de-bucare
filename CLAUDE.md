@@ -55,6 +55,7 @@ Sistema de party game remoto baseado em turnos. Jogadores acessam via browser no
       timestamp: timestamp
     }
   ],
+  criaturaRemovedCount: number,  // criaturas eliminadas ou expulsas desde o início (empate 7+ no placar)
   winner: null | 'moradores' | 'criaturas' | 'bots' | playerId,
   createdAt: timestamp
 }
@@ -497,7 +498,8 @@ Para **“Todas as criaturas cumpriram objetivos individuais”**, contam apenas
 | Todas as criaturas expulsas ou eliminadas                         | Moradores                                        |
 | Criaturas vivas > moradores vivos (qualquer mesa)                 | Criaturas                                        |
 | Empate criaturas == moradores — mesa 5–6                          | Jogo continua                                    |
-| Empate criaturas == moradores — mesa 7+                           | Moradores (praça decide)                         |
+| Empate criaturas == moradores — mesa 7+ e `criaturaRemovedCount > 0` | Moradores (praça decide)                       |
+| Empate criaturas == moradores — mesa 7+ e nenhuma criatura removida | Jogo continua; Folhetim: folclore intacto      |
 | Todas as criaturas cumpriram objetivos individuais                | Criaturas                                        |
 | Rodada atual > maxRounds (lua cheia)                              | Criaturas                                        |
 | Brás Cubas expulso por votação (e opta por encerrar)              | Brás Cubas                                       |

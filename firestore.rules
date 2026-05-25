@@ -16,6 +16,12 @@ service cloud.firestore {
         'bestGame',
         'favoriteRole',
         'rolePlayCounts',
+        'detectiveGamesPlayed',
+        'detectiveBestScore',
+        'detectiveBestRank',
+        'detectiveLastMode',
+        'detectiveLegendCount',
+        'detectiveLegendNoNetCount',
         'isPremium',
         'premiumSince',
         'stripeCustomerId',
@@ -59,6 +65,15 @@ service cloud.firestore {
       match /playerPrivate/{playerId} {
         allow read: if isAuthed() && request.auth.uid == resource.data.authUid;
         allow write: if false;
+      }
+
+      match /players/{playerId} {
+        allow read: if isAuthed();
+        allow update: if isAuthed()
+          && get(/databases/$(database)/documents/rooms/$(roomCode)).data.soloMode == true
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['manualNotes']);
+        allow create, delete: if false;
       }
 
       match /{document=**} {

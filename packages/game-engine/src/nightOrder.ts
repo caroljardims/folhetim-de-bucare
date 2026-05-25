@@ -15,6 +15,8 @@ export const NIGHT_ACTION_ORDER: RoleId[] = [
   "boitata",
   "cartomante",
   "delegado",
+  /** Modo Detetive: última ação da noite (ronda em Bucaré). */
+  "detetive",
 ];
 
 /** Papéis ativos na noite (presentes na ordem e vivos / na partida). */

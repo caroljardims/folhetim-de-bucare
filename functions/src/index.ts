@@ -7,9 +7,15 @@ export {
   createRoom,
   joinRoom,
   startGame,
+  startSoloDetectiveGame,
   addBots,
   restartGame,
 } from "./handlers/game.js";
+
+export {
+  submitDetectiveGuesses,
+  completeDetectiveEndFlow,
+} from "./handlers/detective.js";
 
 export {
   submitNightAction,

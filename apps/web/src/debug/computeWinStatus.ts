@@ -42,14 +42,26 @@ export function computeWinStatusUi(
   round: number,
   maxRounds: number,
   tablePlayerCount: number,
+  criaturaRemovedCount = 0,
 ): WinStatusUi {
   const alive = (p: WinPlayerSnapshot) => p.alive && !p.eliminated && !p.expelled;
   const creatures = Object.values(winPlayers).filter((p) => alive(p) && countsAsCreatureForMajority(p));
   const moradores = Object.values(winPlayers).filter((p) => alive(p) && countsAsMoradorForMajority(p));
-  const d = checkCollectiveWinDetailed(winPlayers, round, maxRounds, tablePlayerCount);
+  const d = checkCollectiveWinDetailed(
+    winPlayers,
+    round,
+    maxRounds,
+    tablePlayerCount,
+    criaturaRemovedCount,
+  );
   let detailLabel = "em andamento";
-  if (d.winner === "moradores") detailLabel = "vitória dos moradores (condição atual)";
-  if (d.winner === "criaturas") detailLabel = "vitória das criaturas (condição atual)";
+  if (d.reason === "tie_folklore_intact") {
+    detailLabel = "empate no placar — folclore intacto (jogo continua)";
+  } else if (d.winner === "moradores") {
+    detailLabel = "vitória dos moradores (condição atual)";
+  } else if (d.winner === "criaturas") {
+    detailLabel = "vitória das criaturas (condição atual)";
+  }
   return {
     creatureCount: creatures.length,
     moradorCount: moradores.length,

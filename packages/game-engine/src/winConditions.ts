@@ -39,7 +39,9 @@ export type CollectiveWinReasonCode =
   | "creatures_strict_majority"
   | "creatures_all_objectives"
   | "full_moon"
-  | "moradores_plaza_tie";
+  | "moradores_plaza_tie"
+  /** Empate no placar com folclore intacto (nenhuma criatura removida) — jogo continua. */
+  | "tie_folklore_intact";
 
 export type CollectiveWinDetail = {
   winner: CollectiveWinner;
@@ -52,13 +54,15 @@ export type CollectiveWinDetail = {
  *
  * @param tablePlayerCount Jogadores conectados ao início da partida (`gameTablePlayerCount`).
  *   Mesa 5–6: maioria criaturas só com `criaturas > moradores` (empate não encerra por placar).
- *   Mesa 7+: idem para criaturas; empate numérico favorece moradores (`moradores_plaza_tie`).
+ *   Mesa 7+: empate numérico favorece moradores (`moradores_plaza_tie`) só se
+ *   `criaturaRemovedCount > 0`; senão `tie_folklore_intact` (jogo continua).
  */
 export function checkCollectiveWinDetailed(
   players: Record<string, WinPlayerSnapshot>,
   round: number,
   maxRounds: number,
   tablePlayerCount: number,
+  criaturaRemovedCount = 0,
 ): CollectiveWinDetail {
   const none: CollectiveWinDetail = { winner: null, reason: null };
 
@@ -84,7 +88,10 @@ export function checkCollectiveWinDetailed(
       return { winner: "criaturas", reason: "creatures_strict_majority" };
     }
     if (creatures.length === moradores.length && creatures.length > 0) {
-      return { winner: "moradores", reason: "moradores_plaza_tie" };
+      if (criaturaRemovedCount > 0) {
+        return { winner: "moradores", reason: "moradores_plaza_tie" };
+      }
+      return { winner: null, reason: "tie_folklore_intact" };
     }
   } else if (isSmallTable) {
     if (creatures.length > moradores.length) {
@@ -113,9 +120,15 @@ export function checkCollectiveWin(
   round: number,
   maxRounds: number,
   tablePlayerCount: number,
+  criaturaRemovedCount = 0,
 ): CollectiveWinner {
-  return checkCollectiveWinDetailed(players, round, maxRounds, tablePlayerCount).winner;
+  return checkCollectiveWinDetailed(players, round, maxRounds, tablePlayerCount, criaturaRemovedCount)
+    .winner;
 }
+
+/** Folhetim quando empate no placar mas nenhuma criatura foi eliminada ou expulsa. */
+export const TIE_FOLKLORE_INTACT_MESSAGE_PT =
+  "Os números se igualaram — mas o folclore ainda está intacto. Bucaré não pode descansar ainda. A noite volta.";
 
 /** Parágrafo explícito para o Folhetim / crônica ao encerrar por vitória coletiva. */
 export function collectiveWinChronicleMessagePt(detail: CollectiveWinDetail): string | null {

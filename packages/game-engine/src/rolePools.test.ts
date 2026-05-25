@@ -3,6 +3,7 @@ import { CREATURE_ROLES, ROLE_SIDE } from "./roles.js";
 import {
   buildResolvedRoles,
   dealRoles,
+  dealSoloDetectiveRoles,
   maxRoundsForPlayerCount,
   poolHasLobisomemImmuneTarget,
   validateRoleComposition,
@@ -83,6 +84,27 @@ describe("rolePools", () => {
     const deal = dealRoles(ids, rngFixed(7));
     expect(Object.keys(deal.byPlayerId)).toHaveLength(7);
     expect(ids.includes(deal.spokespersonId)).toBe(true);
+  });
+
+  it("dealSoloDetectiveRoles assigns 6 valid bot roles", () => {
+    const botIds = ["b1", "b2", "b3", "b4", "b5", "b6"];
+    for (let seed = 0; seed < 80; seed++) {
+      const byId = dealSoloDetectiveRoles(botIds, rngFixed(seed + 900));
+      expect(Object.keys(byId)).toHaveLength(6);
+      const roles = Object.values(byId);
+      expect(roles).not.toContain("detetive");
+      expect(validateRoleComposition(roles)).toBe(true);
+      expect(poolHasLobisomemImmuneTarget(roles)).toBe(true);
+    }
+  });
+
+  it("buildResolvedRoles never includes detetive", () => {
+    for (const n of [5, 6, 7, 8, 9, 12]) {
+      for (let seed = 0; seed < 40; seed++) {
+        const roles = buildResolvedRoles(n, rngFixed(seed + n));
+        expect(roles).not.toContain("detetive");
+      }
+    }
   });
 
   it("mesa 7+: pool sempre inclui alvo imune ao Lobisomem", () => {

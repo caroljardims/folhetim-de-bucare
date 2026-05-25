@@ -23,6 +23,7 @@ import {
   brasToloRevealEndMessage,
   computeBrasAvailableRoles,
 } from "../lib/brasExpulsion.js";
+import { criaturaRemovedIncrementPatch, isCriaturaRole } from "../lib/criaturaRemovedCount.js";
 
 export const brasContinueChoice = onCall(async (req) => {
   requireAuth(req);
@@ -247,6 +248,9 @@ export const coronelStartAccusation = onCall(async (req) => {
   if (winsToUnion.length > 0) {
     roomUp.individualWins = FieldValue.arrayUnion(...winsToUnion);
   }
+  if (isCriaturaRole(targetRole)) {
+    Object.assign(roomUp, criaturaRemovedIncrementPatch(1));
+  }
   b.update(roomRef, roomUp);
 
   if (targetRole === "bras_cubas") {
@@ -344,6 +348,7 @@ export const cangaceiroTiroCerto = onCall(async (req) => {
 
   if (creature) {
     batch.update(meRef, { actionUsed: true });
+    batch.update(roomRef, criaturaRemovedIncrementPatch(1));
     if (targetRole === "iara") {
       batch.update(roomRef, {
         individualWins: FieldValue.arrayUnion({
@@ -389,7 +394,15 @@ export const cangaceiroTiroCerto = onCall(async (req) => {
         p.alignment === "moradores" || p.alignment === "criaturas" ? p.alignment : null,
     };
   }
-  const winDetail = checkCollectiveWinDetailed(winPlayers, round, Number(room.maxRounds ?? 7), Number(room.gameTablePlayerCount ?? 0) || snaps2.length);
+  const criaturaRemovedForWin =
+    Number(room.criaturaRemovedCount ?? 0) + (creature ? 1 : 0);
+  const winDetail = checkCollectiveWinDetailed(
+    winPlayers,
+    round,
+    Number(room.maxRounds ?? 7),
+    Number(room.gameTablePlayerCount ?? 0) || snaps2.length,
+    criaturaRemovedForWin,
+  );
   const w = winDetail.winner;
   if (w) {
     const revealedRoles: Record<string, string> = {};

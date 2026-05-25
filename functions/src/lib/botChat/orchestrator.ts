@@ -192,7 +192,13 @@ export function getBotSegmentsForDayOpen(
 ): BotChatSegment[] {
   const cfg = getCharacterConfig(ctx.role);
   if (rng() < cfg.silentRate) return [];
-  const n = Math.max(1, Math.min(cfg.maxMessages, 1 + Math.floor(rng() * cfg.maxMessages)));
+  let n: number;
+  if (ctx.role === "saci") {
+    n = rng() < 0.5 ? 0 : 3;
+    if (n === 0) return [];
+  } else {
+    n = Math.max(1, Math.min(cfg.maxMessages, 1 + Math.floor(rng() * cfg.maxMessages)));
+  }
   const out: BotChatSegment[] = [];
   const avoid = new Set(opts?.avoidPhrases ?? []);
   const usedTypes: MessageType[] = [];

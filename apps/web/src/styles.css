@@ -5817,3 +5817,251 @@ input::placeholder {
 .eyebrow-ocre { color: var(--ocre-sertao); }
 .eyebrow-mute { color: var(--texto-medio); }
 .serif-italic { font-family: var(--ff-serif); font-style: italic; }
+
+/* ══════════════════════════════════════════════
+   Modo Detetive
+   ══════════════════════════════════════════════ */
+
+.jornal-cta--detetive {
+  font-size: 0.92rem;
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+.detective-mode-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.detective-mode-card {
+  text-align: left;
+  width: 100%;
+}
+
+.detective-guide-link {
+  background: none;
+  border: none;
+  color: var(--ocre-sertao);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 8px 0;
+}
+
+.detective-notebook__toggle {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--borda-suave);
+  background: var(--papel-escuro);
+  color: var(--texto-claro);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.detective-notebook__panel {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detective-mapa {
+  padding: 10px 12px;
+  border: 1px dashed var(--borda-suave);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.detective-mapa__title {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ouro-claro);
+}
+
+.detective-mapa__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.detective-location-night {
+  margin: 12px 0 8px;
+}
+
+.detective-location-night__title {
+  margin: 0 0 4px;
+  font-family: var(--ff-display);
+  font-size: 1.05rem;
+  text-align: center;
+}
+
+.detective-location-night__subtitle {
+  text-align: center;
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+}
+
+.detective-location-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+@media (min-width: 480px) {
+  .detective-location-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.detective-location-card {
+  min-height: 52px;
+  padding: 10px 8px;
+  border: 1px solid var(--borda-suave);
+  border-radius: 8px;
+  background: var(--papel-escuro);
+  color: var(--texto-claro);
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.detective-location-card--selected {
+  border-color: var(--ouro-claro);
+  background: rgba(201, 162, 39, 0.12);
+}
+
+.detective-location-night__cta {
+  width: 100%;
+}
+
+.detective-end__rondas {
+  margin: 16px 0;
+  text-align: left;
+  max-width: 360px;
+}
+
+.detective-end__rondas-title {
+  font-size: 0.9rem;
+  margin: 0 0 8px;
+  color: var(--ouro-claro);
+}
+
+.detective-end__rondas-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.detective-suspect-card {
+  border: 1px solid var(--borda-suave);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.detective-suspect-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.detective-suspect-card__body {
+  padding: 0 12px 12px;
+}
+
+.detective-evidence-line--new {
+  color: var(--ocre-sertao);
+}
+
+.detective-note-field {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.detective-notebook-mobile { display: none; }
+.detective-notebook-desktop { display: block; }
+
+@media (max-width: 720px) {
+  .detective-notebook-mobile { display: block; }
+  .detective-notebook-desktop { display: none; }
+  .detective-notebook-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .detective-notebook-sheet__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  .detective-notebook-sheet__content {
+    position: relative;
+    max-height: 70vh;
+    overflow: auto;
+    background: var(--papel-escuro);
+    border-radius: 16px 16px 0 0;
+    padding: 16px;
+  }
+  .detective-notebook-sheet-trigger {
+    width: 100%;
+    margin: 8px 0;
+    padding: 10px;
+    border: 1px dashed var(--ocre-sertao);
+    background: transparent;
+    color: var(--texto-claro);
+  }
+}
+
+.detective-end {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: var(--noite);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.detective-end__rank {
+  font-family: var(--ff-cordel);
+  font-size: 2rem;
+  letter-spacing: 0.08em;
+}
+
+.detective-end__no-net {
+  color: var(--ocre-sertao);
+  font-family: var(--ff-cordel);
+}
+
+.detective-guide__title {
+  font-family: var(--ff-cordel);
+  font-size: 1.75rem;
+}
+
+.detective-guide__body section {
+  margin-bottom: 1.5rem;
+}

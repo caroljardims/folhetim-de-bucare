@@ -14,6 +14,13 @@ import {
   readMasterRoomCodeFromUrl,
 } from "./auth/masterPlayerFirebase.js";
 import "./styles.css";
+import { isDetectiveGuidePathname } from "./lib/detectiveRoute.js";
+
+const DetectiveGuideScreenLazy = lazy(() =>
+  import("./components/detective/DetectiveGuideScreen.js").then((m) => ({
+    default: m.DetectiveGuideScreen,
+  })),
+);
 
 const MasterDebugPanelLazy = lazy(() => import("./debug/master/MasterDebugPanel.js"));
 
@@ -49,6 +56,20 @@ function Root() {
         </Suspense>
       );
     }
+  }
+
+  if (typeof window !== "undefined" && isDetectiveGuidePathname(window.location.pathname)) {
+    return (
+      <Suspense
+        fallback={
+          <div className="page connecting-page">
+            <p className="connecting-text">carregando…</p>
+          </div>
+        }
+      >
+        <DetectiveGuideScreenLazy />
+      </Suspense>
+    );
   }
 
   const masterPlayerId = readMasterPlayerIdFromUrl();

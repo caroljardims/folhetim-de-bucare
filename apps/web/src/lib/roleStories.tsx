@@ -18,6 +18,7 @@ export const ROLE_DISPLAY: Record<string, string> = {
   padre: "⛪️ Padre",
   coronel: "💰 Coronel",
   aldeao: "👨‍🌾 Aldeão",
+  detetive: "🔍 Detetive",
 };
 
 /** Placeholder (aldeão) enquanto não houver xilo do personagem. */
@@ -632,6 +633,18 @@ export const ROLE_LORE: Record<string, string | LoreRich> = {
         kind: "aside",
         text:
           "Se a acusação cair em outra pessoa, você ainda expulsa o alvo — mas a praça passa a saber quem deu a ordem; dá para vencer com os moradores, mas sem a estrela da conquista individual sobre o Boitatá.",
+      },
+    ],
+  },
+  detetive: {
+    narrative:
+      "Você veio de fora para ouvir Bucaré — não para caçar criaturas nem para salvar a praça. Sua vitória é outra: ver o que ninguém mais viu antes do cordel fechar.",
+    sections: [
+      { kind: "kv", title: "Lado", content: "Neutro (investigador)" },
+      {
+        kind: "kv",
+        title: "À noite",
+        content: "Você observa. A cidade dorme; nenhuma ação sua altera o folclore.",
       },
     ],
   },

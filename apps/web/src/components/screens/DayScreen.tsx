@@ -15,6 +15,7 @@ import { BtnSpinner } from "../BtnSpinner.js";
 import { VotingFinalizeBanner } from "../day/VotingFinalizeBanner.js";
 import { VotingStatusPanel } from "../day/VotingStatusPanel.js";
 import { FolhetimOverlay } from "../FolhetimOverlay.js";
+import { DetectiveNotebook } from "../detective/DetectiveNotebook.js";
 
 export type DayScreenProps = {
   room: RoomDoc;
@@ -308,6 +309,19 @@ export function DayScreen({
         </div>
         <div className="mini-folhetim__reler">▸ reler</div>
       </button>
+
+      {room.soloMode && (
+        <DetectiveNotebook
+          room={room}
+          roomCode={roomCode}
+          playerId={playerId}
+          selfGlyph={selfGlyph}
+          players={players}
+          myPlayer={myPlayer}
+          currentRound={currentRound}
+          revealedRoles={room.revealedRoles}
+        />
+      )}
 
       <div className="dia-scroll">
       <DayStages stage={dayStage} onStage={setDayStage} votePending={votePending} />

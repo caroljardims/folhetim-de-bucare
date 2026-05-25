@@ -8,6 +8,7 @@ import {
   tallyExpulsionVotes,
   checkCollectiveWinDetailed,
   collectiveWinChronicleMessagePt,
+  TIE_FOLKLORE_INTACT_MESSAGE_PT,
   normalizeGeniInvestigatedTargets,
   isCreatureRole,
   displayRoleName,
@@ -40,6 +41,13 @@ import {
   hydrateKnowledgeMapFromPlayerRows,
 } from "./botKnowledge/dayMerge.js";
 import { canBeExpulsionVoteTarget, canSubmitExpulsionVote } from "./playerVote.js";
+import { criaturaRemovedIncrementPatch, isCriaturaRole } from "./criaturaRemovedCount.js";
+import {
+  appendExpulsaoReveladora,
+  appendPrivateDawnEvidence,
+  appendSilencioSuspeito,
+  appendVotoSuspeito,
+} from "./detectiveEvidence/index.js";
 
 type LoadedPlayer = Awaited<ReturnType<typeof loadPlayers>>[number];
 type SecretsMap = Awaited<ReturnType<typeof loadSecrets>>;
@@ -195,14 +203,35 @@ export async function tryEndGameCollective(
   ) {
     checkRound = Math.max(round, maxR + 1);
   }
-  const winDetail = checkCollectiveWinDetailed(winPlayers, checkRound, maxR, tpc);
+  const criaturaRemovedCount = Number(merged.criaturaRemovedCount ?? 0);
+  const winDetail = checkCollectiveWinDetailed(
+    winPlayers,
+    checkRound,
+    maxR,
+    tpc,
+    criaturaRemovedCount,
+  );
+  if (winDetail.reason === "tie_folklore_intact") {
+    const roomRef = db.collection("rooms").doc(roomCode);
+    await roomRef.collection("publicLogEntries").add({
+      round,
+      type: "special",
+      message: TIE_FOLKLORE_INTACT_MESSAGE_PT,
+      timestamp: Date.now(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return false;
+  }
   const w = winDetail.winner;
   if (!w) return false;
 
+  const isSolo = merged.soloMode === true;
   const revealedRoles: Record<string, string> = {};
-  for (const p of snaps) {
-    const r = sec[p.id]?.role;
-    if (r) revealedRoles[p.id] = r;
+  if (!isSolo) {
+    for (const p of snaps) {
+      const r = sec[p.id]?.role;
+      if (r) revealedRoles[p.id] = r;
+    }
   }
   const endMsg = collectiveWinChronicleMessagePt(winDetail);
   const endBatch = db.batch();
@@ -212,7 +241,9 @@ export async function tryEndGameCollective(
     phase: "ended",
     winner: w,
     votingOpen: false,
-    revealedRoles,
+    ...(isSolo
+      ? { detectivePhase: "accusation", detectiveGuesses: null, detectiveScore: null }
+      : { revealedRoles }),
     ...(winDetail.reason === "moradores_plaza_tie"
       ? { collectiveEndKind: "moradores_plaza_tie" }
       : { collectiveEndKind: FieldValue.delete() }),
@@ -234,7 +265,9 @@ export async function tryEndGameCollective(
   if (w === "moradores") {
     await grantAldeaoObjectiveIfMoradoresWon(roomCode, round, w, snaps, sec).catch(console.error);
   }
-  await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
+  if (!isSolo) {
+    await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
+  }
   return true;
 }
 
@@ -246,11 +279,26 @@ export async function maybeFinalizeNight(roomCode: string, round: number): Promi
   const pendingRoles = (room.nightPendingRoles as RoleId[]) ?? [];
   if (pendingRoles.length > 0) return false;
 
-  const readyIds = new Set((room.nightReadyPlayerIds as string[] | undefined) ?? []);
+  let readyIds = new Set((room.nightReadyPlayerIds as string[] | undefined) ?? []);
   const players = await loadPlayers(roomCode);
   const aliveIds = players
     .filter((p) => p.alive !== false && !p.eliminated && !p.expelled)
     .map((p) => p.id);
+
+  if (room.soloMode === true) {
+    const [sec] = await Promise.all([loadSecrets(roomCode)]);
+    const missing = aliveIds.filter((id) => !readyIds.has(id));
+    const toAuto: string[] = [];
+    for (const id of missing) {
+      const role = sec[id]?.role;
+      if (role === "cangaceiro") toAuto.push(id);
+    }
+    if (toAuto.length > 0) {
+      await roomRef.update({ nightReadyPlayerIds: FieldValue.arrayUnion(...toAuto) });
+      for (const id of toAuto) readyIds.add(id);
+    }
+  }
+
   if (!aliveIds.every((id) => readyIds.has(id))) return false;
 
   await finalizeNight(roomCode, round);
@@ -320,6 +368,11 @@ export async function finalizeNight(roomCode: string, round: number) {
     nightActions,
     geniInvestigatedIds,
   });
+
+  if (room.soloMode === true) {
+    const { applyDetectiveLocationInvestigation } = await import("./detectiveLocationResolve.js");
+    await applyDetectiveLocationInvestigation(roomCode, round, nightActions);
+  }
 
   /* --- Bots: atualiza saber pela noite / chat anterior e já deposita votos no doc da rodada. --- */
   const botIdNight = new Set(players.filter((p) => Boolean(p.isBot)).map((p) => p.id));
@@ -408,7 +461,15 @@ export async function finalizeNight(roomCode: string, round: number) {
   const botDbgReasonNight: Record<string, string> = {};
   const botVotesForBatch: Record<string, string | null> = {};
 
-  for (const { id: voterId, state: vst } of aliveLivNight) {
+  const voteOrderNight = [...aliveLivNight].sort((a, b) => {
+    const ra = secrets[a.id]?.role;
+    const rb = secrets[b.id]?.role;
+    if (ra === "lobisomem" && rb !== "lobisomem") return -1;
+    if (rb === "lobisomem" && ra !== "lobisomem") return 1;
+    return 0;
+  });
+
+  for (const { id: voterId, state: vst } of voteOrderNight) {
     if (!botIdNight.has(voterId) || vst.seduced || vst.jailed) continue;
     const kb = kbByBotId.get(voterId);
     if (!kb || !livingNightIds.has(voterId)) continue;
@@ -590,6 +651,17 @@ export async function finalizeNight(roomCode: string, round: number) {
     }
   }
 
+  let criaturaRemovedBump = 0;
+  for (const [pid, pl] of Object.entries(res.players)) {
+    const before = dawnPlayers[pid];
+    if (!before) continue;
+    const wasIn = before.alive && !before.eliminated && !before.expelled;
+    const nowOut = !pl.alive || pl.eliminated || pl.expelled;
+    if (wasIn && nowOut && isCriaturaRole(secrets[pid]?.role)) {
+      criaturaRemovedBump++;
+    }
+  }
+
   batch.update(roomRef, {
     status: "day",
     phase: "day",
@@ -603,6 +675,7 @@ export async function finalizeNight(roomCode: string, round: number) {
     individualWins: wins,
     botoEnchantedMoradores,
     padreCatechizedMoradores,
+    ...criaturaRemovedIncrementPatch(criaturaRemovedBump),
   });
 
   const openRef = roomRef.collection("publicLogEntries").doc();
@@ -683,6 +756,26 @@ export async function finalizeNight(roomCode: string, round: number) {
   );
 
   await Promise.all(postObjectiveUpdates);
+
+  if (room.soloMode === true) {
+    const human = players.find((p) => !p.isBot);
+    if (human) {
+      const privMsgs = (res.privateLog[human.id] ?? []).map((e) => String(e.message ?? ""));
+      await appendPrivateDawnEvidence(roomCode, round, human.id, privMsgs).catch(console.error);
+      const deathEntry = res.publicLog.find((e) => e.type === "death");
+      if (deathEntry) {
+        const victimMatch = deathEntry.message.match(/\[([^\]]+)\]/);
+        const victimName = victimMatch?.[1] ?? "alguém";
+        const nameById = new Map(players.map((p) => [p.id, String(p.name ?? p.id)]));
+        const silentBots = players
+          .filter((p) => p.isBot && p.alive !== false && !p.eliminated && !p.expelled)
+          .map((p) => p.id);
+        await appendSilencioSuspeito(roomCode, round, silentBots, victimName, nameById).catch(
+          console.error,
+        );
+      }
+    }
+  }
 
   if (await tryEndGameCollective(roomCode, round, room)) {
     return;
@@ -1054,6 +1147,7 @@ export async function finalizeDay(roomCode: string, round: number) {
               brasAvailableRoles: computeBrasAvailableRoles(players, secrets, tally.expelledId),
             }
           : {}),
+        ...criaturaRemovedIncrementPatch(isCriaturaRole(role) ? 1 : 0),
       };
       if (role === "padre") {
         const mulaPlayer = players.find((p) => secrets[p.id]?.role === "mula");
@@ -1086,6 +1180,48 @@ export async function finalizeDay(roomCode: string, round: number) {
   }
 
   await batch.commit();
+
+  if (room.soloMode === true && tally.expelledId) {
+    const expRole = secrets[tally.expelledId]!.role;
+    const nameById = new Map(players.map((p) => [p.id, String(p.name ?? p.id)]));
+    const chatSnap = await roomRef.collection("chat").where("votesRound", "==", voteRound).get();
+    const defenders = new Set<string>();
+    for (const d of chatSnap.docs) {
+      const data = d.data();
+      if (
+        data.semanticKind === "DEFEND" &&
+        data.semanticTargetId === tally.expelledId &&
+        typeof data.playerId === "string" &&
+        botIdSetFinalize.has(data.playerId)
+      ) {
+        defenders.add(data.playerId);
+      }
+    }
+    await appendExpulsaoReveladora(
+      roomCode,
+      voteRound,
+      tally.expelledId,
+      expRole,
+      [...defenders],
+      nameById,
+    ).catch(console.error);
+    for (const [voterId, targetId] of Object.entries(voteRecord)) {
+      if (
+        typeof targetId === "string" &&
+        targetId === tally.expelledId &&
+        botIdSetFinalize.has(voterId)
+      ) {
+        await appendVotoSuspeito(
+          roomCode,
+          voteRound,
+          voterId,
+          targetId,
+          expRole,
+          nameById,
+        ).catch(console.error);
+      }
+    }
+  }
 
   if (await endGameApocalypseIfNoHumans(roomCode, voteRound)) return;
 

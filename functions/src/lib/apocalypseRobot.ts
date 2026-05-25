@@ -57,13 +57,22 @@ export async function endGameApocalypseIfNoHumans(
   }
   const maxR = Number(room.maxRounds ?? 7);
   const tpc = Number(room.gameTablePlayerCount ?? 0) || players.length;
-  const detail = checkCollectiveWinDetailed(wpCheck, round, maxR, tpc);
+  const detail = checkCollectiveWinDetailed(
+    wpCheck,
+    round,
+    maxR,
+    tpc,
+    Number(room.criaturaRemovedCount ?? 0),
+  );
   const forcedWinner = detail.winner ?? "bots";
 
+  const isSolo = room.soloMode === true;
   const revealedRoles: Record<string, string> = {};
-  for (const p of players) {
-    const r = secrets[p.id]?.role;
-    if (r) revealedRoles[p.id] = r;
+  if (!isSolo) {
+    for (const p of players) {
+      const r = secrets[p.id]?.role;
+      if (r) revealedRoles[p.id] = r;
+    }
   }
 
   const endBatch = db.batch();
@@ -74,7 +83,9 @@ export async function endGameApocalypseIfNoHumans(
     votingOpen: false,
     pendingNightStart: false,
     pendingNightRound: FieldValue.delete(),
-    revealedRoles,
+    ...(isSolo
+      ? { detectivePhase: "accusation", detectiveGuesses: null, detectiveScore: null }
+      : { revealedRoles }),
     ...(detail.reason === "moradores_plaza_tie"
       ? { collectiveEndKind: "moradores_plaza_tie" }
       : { collectiveEndKind: FieldValue.delete() }),
@@ -97,6 +108,8 @@ export async function endGameApocalypseIfNoHumans(
       console.error,
     );
   }
-  await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
+  if (!isSolo) {
+    await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
+  }
   return true;
 }

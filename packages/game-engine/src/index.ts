@@ -11,3 +11,4 @@ export * from "./winConditions.js";
 export * from "./copy.js";
 export * from "./scoring.js";
 export * from "./saciGorroTargets.js";
+export * from "./detectiveLocations.js";

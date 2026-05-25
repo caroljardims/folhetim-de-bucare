@@ -117,19 +117,32 @@ describe("checkCollectiveWin", () => {
     expect(detail.reason).toBeNull();
   });
 
-  it("mesa 7+: empate numérico criaturas === moradores favorece moradores (praça)", () => {
+  it("Tie with one criatura removed → moradores win (mesa 7+)", () => {
     const players = {
       w: snap("w", "lobisomem"),
       s: snap("s", "saci"),
       a: snap("a", "aldeao"),
       d: snap("d", "doutor"),
     };
-    const detail = checkCollectiveWinDetailed(players, 1, 7, t7);
+    const detail = checkCollectiveWinDetailed(players, 1, 7, t7, 1);
     expect(detail.winner).toBe("moradores");
     expect(detail.reason).toBe("moradores_plaza_tie");
     const msg = collectiveWinChronicleMessagePt(detail);
     expect(msg).toContain("empate");
     expect(msg).toContain("moradores venceram");
+  });
+
+  it("Tie with zero criaturas removed → game continues (mesa 7+)", () => {
+    const players = {
+      w: snap("w", "lobisomem"),
+      s: snap("s", "saci"),
+      a: snap("a", "aldeao"),
+      d: snap("d", "doutor"),
+    };
+    const detail = checkCollectiveWinDetailed(players, 1, 7, t7, 0);
+    expect(detail.winner).toBeNull();
+    expect(detail.reason).toBe("tie_folklore_intact");
+    expect(collectiveWinChronicleMessagePt(detail)).toBeNull();
   });
 
   it("mesa 7+: criaturas > moradores ainda vencem as criaturas", () => {
@@ -138,7 +151,7 @@ describe("checkCollectiveWin", () => {
       s: snap("s", "saci"),
       a: snap("a", "aldeao"),
     };
-    const d = checkCollectiveWinDetailed(players, 1, 7, t7);
+    const d = checkCollectiveWinDetailed(players, 1, 7, t7, 0);
     expect(d.reason).toBe("creatures_strict_majority");
     const msg = collectiveWinChronicleMessagePt(d);
     expect(msg).toContain("folclore");
