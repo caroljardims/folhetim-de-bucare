@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { db, loadPlayers, loadSecrets } from "../helpers.js";
 import { finalizeDay, maybeFinalizeDayIfAllVotesIn, tryEndGameCollective } from "../lib/finalize.js";
+import { completeApocalypseRoboEnd } from "../lib/apocalypseRobot.js";
 import { clearPendingVotingFinalize } from "../lib/votingFinalize.js";
 import { canBeExpulsionVoteTarget, canSubmitExpulsionVote } from "../lib/playerVote.js";
 import { assertRoomHost, findPlayer, requireAuth } from "./shared.js";
@@ -17,6 +18,9 @@ export const submitVote = onCall(async (req) => {
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
   if (room.status !== "day") throw new HttpsError("failed-precondition", "Não é fase do dia.");
+  if (room.apocalipseRoboPendingDay === true) {
+    throw new HttpsError("failed-precondition", "A praça observa o Apocalipse Robô — votação encerrada.");
+  }
 
   const voteRound = Number(room.votesRound ?? room.round ?? 1);
   if (Number(room.voidedDayExpulsionRound) === voteRound) {
@@ -165,9 +169,19 @@ export const advanceDay = onCall(async (req) => {
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
   if (room.status !== "day") throw new HttpsError("failed-precondition", "Não é fase do dia.");
+  if (room.apocalipseRoboPendingDay === true) {
+    throw new HttpsError("failed-precondition", "O dia de observação do Apocalipse Robô está em curso.");
+  }
 
   const players = await loadPlayers(code);
-  assertRoomHost(room, players, req, "Apenas o anfitrião pode encerrar o dia.");
+  if (room.soloMode === true) {
+    const me = findPlayer(players, req);
+    if (!me || me.isBot) {
+      throw new HttpsError("permission-denied", "Apenas o detetive pode encerrar o dia.");
+    }
+  } else {
+    assertRoomHost(room, players, req, "Apenas o anfitrião pode encerrar o dia.");
+  }
 
   const round = Number(room.votesRound ?? room.round ?? 1);
 
@@ -186,6 +200,55 @@ export const advanceDay = onCall(async (req) => {
   if (!isStuck) return { ok: true };
 
   if (await tryEndGameCollective(code, round, room)) return { ok: true };
-  await roomRef.update({ pendingNightStart: true, pendingNightRound: round + 1 });
+  const { advanceToNextNightOrAuto } = await import("../lib/detectiveElimination.js");
+  await advanceToNextNightOrAuto(code, round, room);
+  return { ok: true };
+});
+
+/** Modo Detetive: reavalia se o dia pode fechar (ex.: bots já votaram ao amanhecer). */
+export const soloTryCloseDay = onCall(async (req) => {
+  requireAuth(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  if (!code) throw new HttpsError("invalid-argument", "Código inválido.");
+
+  const roomRef = db.collection("rooms").doc(code);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
+  const room = roomSnap.data()!;
+  if (room.soloMode !== true) throw new HttpsError("failed-precondition", "Não é Modo Detetive.");
+  if (room.status !== "day") throw new HttpsError("failed-precondition", "Não é fase do dia.");
+
+  const players = await loadPlayers(code);
+  const me = findPlayer(players, req);
+  if (!me || me.isBot) {
+    throw new HttpsError("permission-denied", "Apenas o detetive.");
+  }
+
+  const round = Number(room.votesRound ?? room.round ?? 1);
+  await maybeFinalizeDayIfAllVotesIn(code, round, { allowSoloBotsOnly: true });
+  return { ok: true };
+});
+
+export const completeApocalypseRobo = onCall(async (req) => {
+  requireAuth(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  if (!code) throw new HttpsError("invalid-argument", "Código inválido.");
+
+  const roomRef = db.collection("rooms").doc(code);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
+  const room = roomSnap.data()!;
+  if (room.status !== "day") throw new HttpsError("failed-precondition", "Não é fase do dia.");
+  if (room.apocalipseRoboPendingDay !== true) {
+    throw new HttpsError("failed-precondition", "Apocalipse Robô não está pendente.");
+  }
+
+  const players = await loadPlayers(code);
+  const me = findPlayer(players, req);
+  if (!me) throw new HttpsError("permission-denied", "Fora da sala.");
+
+  const round = Number(room.votesRound ?? room.round ?? 1);
+  const ok = await completeApocalypseRoboEnd(code, round);
+  if (!ok) throw new HttpsError("failed-precondition", "Apocalipse Robô não pode ser encerrado agora.");
   return { ok: true };
 });

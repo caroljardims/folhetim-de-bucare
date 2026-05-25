@@ -1,5 +1,24 @@
 import { BtnSpinner } from "../BtnSpinner.js";
-import { ALL_BUCARE_LOCATIONS, LOCATION_LABEL_PT, type BucareLocation } from "../../lib/detectiveLocations.js";
+import {
+  ALL_BUCARE_LOCATIONS,
+  LOCATION_LABEL_PT,
+  type BucareLocation,
+} from "../../lib/detectiveLocations.js";
+import "./detectiveFlow.css";
+
+const LOCATION_ICONS: Record<BucareLocation, string> = {
+  fazenda: "🌾",
+  lanchonete: "🪔",
+  cais: "⚓",
+  rio: "🌊",
+  igreja: "✝",
+  floresta: "🌿",
+  posto_de_saude: "🏥",
+  tenda: "🔮",
+  terreiro: "🕯️",
+  casa: "🏠",
+  cemiterio: "☽",
+};
 
 type Props = {
   selected: BucareLocation | "";
@@ -18,13 +37,18 @@ export function DetectiveLocationNight({
   disabled,
   busy,
 }: Props) {
+  const hasSelection = Boolean(selected);
+
   return (
     <div className="detective-location-night">
-      <p className="detective-location-night__title">Onde você vai investigar esta noite?</p>
-      <p className="detective-location-night__subtitle muted">
+      <p className="detective-location-night__subtitle">
         Escolha um lugar em Bucaré para rondar.
       </p>
-      <div className="detective-location-grid" role="listbox" aria-label="Lugares de Bucaré">
+      <div
+        className={`detective-location-grid${hasSelection ? " detective-location-grid--has-selection" : ""}`}
+        role="listbox"
+        aria-label="Lugares de Bucaré"
+      >
         {ALL_BUCARE_LOCATIONS.map((loc) => {
           const active = selected === loc;
           return (
@@ -37,6 +61,9 @@ export function DetectiveLocationNight({
               disabled={disabled || sent}
               onClick={() => onSelect(loc)}
             >
+              <span className="detective-location-card__icon" aria-hidden>
+                {LOCATION_ICONS[loc]}
+              </span>
               <span className="detective-location-card__name">{LOCATION_LABEL_PT[loc]}</span>
             </button>
           );
@@ -48,8 +75,8 @@ export function DetectiveLocationNight({
         disabled={disabled || sent || !selected || busy}
         onClick={onSubmit}
       >
-        <span className="btn-title-row">
-          {sent ? "✓ Ronda registrada" : busy ? "enviando…" : "Investigar"}
+        <span className="btn-title btn-title-row">
+          {sent ? "✓ Ronda registrada" : busy ? "enviando…" : "Investigar →"}
           <BtnSpinner show={busy && !sent} />
         </span>
       </button>

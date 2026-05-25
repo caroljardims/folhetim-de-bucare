@@ -118,15 +118,15 @@ export async function runPostExpulsionTail(
     return;
   }
 
-  const { endGameApocalypseIfNoHumans } = await import("./apocalypseRobot.js");
-  if (await endGameApocalypseIfNoHumans(roomCode, round)) return;
+  const { markApocalypseRoboIfNeeded } = await import("./apocalypseRobot.js");
+  if (await markApocalypseRoboIfNeeded(roomCode, round)) return;
   const { tryEndGameCollective } = await import("./finalize.js");
   if (await tryEndGameCollective(roomCode, round, room)) {
     return;
   }
 
-  const nextRound = round + 1;
-  await roomRef.update({ pendingNightStart: true, pendingNightRound: nextRound });
+  const { advanceToNextNightOrAuto } = await import("./detectiveElimination.js");
+  await advanceToNextNightOrAuto(roomCode, round, room);
 }
 
 async function processGorroExpulsion(

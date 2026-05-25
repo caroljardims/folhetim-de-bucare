@@ -4117,6 +4117,18 @@ input::placeholder {
   width: 100%;
 }
 
+.dia-solo-apurar {
+  flex-shrink: 0;
+  padding: 10px 16px 0;
+  z-index: 9;
+}
+
+.dia-solo-apurar__btn {
+  width: 100%;
+  justify-content: center;
+  letter-spacing: 0.14em;
+}
+
 .dia-bottom {
   flex-shrink: 0;
   display: flex;
@@ -5828,121 +5840,6 @@ input::placeholder {
   opacity: 0.92;
 }
 
-.detective-mode-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 24px 0;
-}
-
-.detective-mode-card {
-  text-align: left;
-  width: 100%;
-}
-
-.detective-guide-link {
-  background: none;
-  border: none;
-  color: var(--ocre-sertao);
-  font-size: 0.85rem;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 8px 0;
-}
-
-.detective-notebook__toggle {
-  width: 100%;
-  text-align: left;
-  padding: 12px 14px;
-  border: 1px solid var(--borda-suave);
-  background: var(--papel-escuro);
-  color: var(--texto-claro);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.detective-notebook__panel {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.detective-mapa {
-  padding: 10px 12px;
-  border: 1px dashed var(--borda-suave);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.detective-mapa__title {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ouro-claro);
-}
-
-.detective-mapa__list {
-  margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.detective-location-night {
-  margin: 12px 0 8px;
-}
-
-.detective-location-night__title {
-  margin: 0 0 4px;
-  font-family: var(--ff-display);
-  font-size: 1.05rem;
-  text-align: center;
-}
-
-.detective-location-night__subtitle {
-  text-align: center;
-  margin: 0 0 14px;
-  font-size: 0.9rem;
-}
-
-.detective-location-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-@media (min-width: 480px) {
-  .detective-location-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.detective-location-card {
-  min-height: 52px;
-  padding: 10px 8px;
-  border: 1px solid var(--borda-suave);
-  border-radius: 8px;
-  background: var(--papel-escuro);
-  color: var(--texto-claro);
-  cursor: pointer;
-  text-align: center;
-  font-size: 0.82rem;
-  line-height: 1.25;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.detective-location-card--selected {
-  border-color: var(--ouro-claro);
-  background: rgba(201, 162, 39, 0.12);
-}
-
-.detective-location-night__cta {
-  width: 100%;
-}
-
 .detective-end__rondas {
   margin: 16px 0;
   text-align: left;
@@ -5985,54 +5882,6 @@ input::placeholder {
   padding: 0 12px 12px;
 }
 
-.detective-evidence-line--new {
-  color: var(--ocre-sertao);
-}
-
-.detective-note-field {
-  width: 100%;
-  min-height: 72px;
-  resize: vertical;
-  margin-bottom: 8px;
-}
-
-.detective-notebook-mobile { display: none; }
-.detective-notebook-desktop { display: block; }
-
-@media (max-width: 720px) {
-  .detective-notebook-mobile { display: block; }
-  .detective-notebook-desktop { display: none; }
-  .detective-notebook-sheet {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-  }
-  .detective-notebook-sheet__backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-  }
-  .detective-notebook-sheet__content {
-    position: relative;
-    max-height: 70vh;
-    overflow: auto;
-    background: var(--papel-escuro);
-    border-radius: 16px 16px 0 0;
-    padding: 16px;
-  }
-  .detective-notebook-sheet-trigger {
-    width: 100%;
-    margin: 8px 0;
-    padding: 10px;
-    border: 1px dashed var(--ocre-sertao);
-    background: transparent;
-    color: var(--texto-claro);
-  }
-}
-
 .detective-end {
   position: fixed;
   inset: 0;
@@ -6064,4 +5913,143 @@ input::placeholder {
 
 .detective-guide__body section {
   margin-bottom: 1.5rem;
+}
+
+/* ── Apocalipse Robô — observation day + interstitial ── */
+
+.apocalypse-observe {
+  margin: 16px 0 8px;
+  text-align: center;
+}
+
+.apocalypse-observe__eyebrow {
+  margin: 0 0 4px;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--texto-poeira);
+}
+
+.apocalypse-observe__lead {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  color: var(--texto-medio);
+}
+
+.apocalypse-observe__card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 169, 110, 0.12);
+  border-radius: var(--r-md, 12px);
+  padding: 18px 16px 16px;
+  text-align: center;
+}
+
+.apocalypse-observe__icon {
+  display: block;
+  font-size: 1.6rem;
+  line-height: 1;
+  margin-bottom: 8px;
+  opacity: 0.85;
+}
+
+.apocalypse-observe__title {
+  margin: 0 0 4px;
+  font-family: var(--ff-headline);
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--texto-medio);
+}
+
+.apocalypse-observe__copy {
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  color: var(--texto-poeira);
+}
+
+.apocalypse-observe__timer {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.apocalypse-observe__timer-bar {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: rgba(201, 169, 110, 0.45);
+  transition: transform 0.25s linear;
+}
+
+.apocalypse-observe__countdown {
+  margin: 0 0 14px;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--texto-poeira);
+}
+
+.apocalypse-observe__cta {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  letter-spacing: 0.16em;
+}
+
+.apocalypse-observe__copy--sub {
+  margin-top: 8px;
+  font-size: 0.88rem;
+  color: var(--texto-poeira);
+}
+
+.detective-ghost-observe .apocalypse-observe__card {
+  border-color: rgba(139, 32, 32, 0.25);
+}
+
+.apocalypse-interstitial {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 6, 4, 0.96);
+}
+
+.apocalypse-interstitial__inner {
+  max-width: 520px;
+  text-align: center;
+}
+
+.apocalypse-interstitial__label {
+  margin: 0 0 16px;
+  font-family: var(--ff-cordel);
+  font-size: 1.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ouro-claro);
+}
+
+.apocalypse-interstitial__text {
+  margin: 0;
+  font-family: var(--ff-body);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--texto-claro);
+  white-space: pre-line;
+}
+
+.detective-elim-interstitial__lead {
+  margin-bottom: 20px;
+  font-family: var(--ff-hand);
+  font-size: 1.05rem;
+}
+
+.detective-elim-interstitial__body {
+  font-size: 0.95rem;
+  color: var(--texto-poeira);
 }

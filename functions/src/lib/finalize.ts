@@ -24,7 +24,12 @@ import {
   brasToloRevealEndMessage,
   computeBrasAvailableRoles,
 } from "./brasExpulsion.js";
-import { endGameApocalypseIfNoHumans } from "./apocalypseRobot.js";
+import { countLivingHumans, markApocalypseRoboIfNeeded } from "./apocalypseRobot.js";
+import {
+  DETECTIVE_DEATH_PUBLIC_LOG_PT,
+  DETECTIVE_EXPULSION_PUBLIC_LOG_PT,
+  markDetectiveEliminatedIfNeeded,
+} from "./detectiveElimination.js";
 import { beginSaciGorroOffer, runPostExpulsionTail } from "./saciGorro.js";
 import { buildBotContext, getBotSegmentsForDayOpen, normalizePhraseKey } from "./botChat/index.js";
 import { mergeBotKnowledgeFromNightResolve } from "./botKnowledge/applyFromNightResolve.js";
@@ -47,6 +52,7 @@ import {
   appendPrivateDawnEvidence,
   appendSilencioSuspeito,
   appendVotoSuspeito,
+  botIdsSilentInDayRound,
 } from "./detectiveEvidence/index.js";
 
 type LoadedPlayer = Awaited<ReturnType<typeof loadPlayers>>[number];
@@ -226,8 +232,9 @@ export async function tryEndGameCollective(
   if (!w) return false;
 
   const isSolo = merged.soloMode === true;
+  const detectiveEliminatedAtEnd = isSolo && merged.detectiveEliminatedAt != null;
   const revealedRoles: Record<string, string> = {};
-  if (!isSolo) {
+  if (!isSolo || detectiveEliminatedAtEnd) {
     for (const p of snaps) {
       const r = sec[p.id]?.role;
       if (r) revealedRoles[p.id] = r;
@@ -236,13 +243,30 @@ export async function tryEndGameCollective(
   const endMsg = collectiveWinChronicleMessagePt(winDetail);
   const endBatch = db.batch();
   const extraWins = collectFiveTableNeutralEndWins(snaps, sec, round, tpc);
+  const soloPhase = merged.detectivePhase as string | undefined;
+  let soloPhaseAfterEnd: string;
+  if (detectiveEliminatedAtEnd) {
+    soloPhaseAfterEnd = soloPhase === "score" ? "score" : "reveal";
+  } else {
+    soloPhaseAfterEnd =
+      soloPhase === "reveal" || soloPhase === "score" ? soloPhase : "accusation";
+  }
   const roomEndPatch: Record<string, unknown> = {
     status: "ended",
     phase: "ended",
     winner: w,
     votingOpen: false,
     ...(isSolo
-      ? { detectivePhase: "accusation", detectiveGuesses: null, detectiveScore: null }
+      ? {
+          detectiveGhostObservation: false,
+          detectivePhase: soloPhaseAfterEnd,
+          ...(detectiveEliminatedAtEnd || soloPhase === "reveal" || soloPhase === "score"
+            ? { revealedRoles }
+            : {}),
+          ...(detectiveEliminatedAtEnd || soloPhase === "reveal" || soloPhase === "score"
+            ? {}
+            : { detectiveGuesses: null, detectiveScore: null }),
+        }
       : { revealedRoles }),
     ...(winDetail.reason === "moradores_plaza_tie"
       ? { collectiveEndKind: "moradores_plaza_tie" }
@@ -581,6 +605,25 @@ export async function finalizeNight(roomCode: string, round: number) {
     batch.update(ref, upd);
   }
 
+  if (room.soloMode === true) {
+    const humanDet = players.find((p) => !p.isBot);
+    if (humanDet && secrets[humanDet.id]?.role === "detetive") {
+      const detName = String(humanDet.name ?? humanDet.id);
+      const afterDet = res.players[humanDet.id];
+      const wasOut =
+        Boolean(dawnPlayers[humanDet.id]?.eliminated) ||
+        Boolean(dawnPlayers[humanDet.id]?.expelled);
+      const nowOut = Boolean(afterDet?.eliminated || afterDet?.expelled);
+      if (nowOut && !wasOut) {
+        for (const e of res.publicLog) {
+          if (e.type === "death" && String(e.message ?? "").includes(detName)) {
+            e.message = DETECTIVE_DEATH_PUBLIC_LOG_PT(detName);
+          }
+        }
+      }
+    }
+  }
+
   for (const e of res.publicLog) {
     const ref = roomRef.collection("publicLogEntries").doc();
     batch.set(ref, { ...e, createdAt: FieldValue.serverTimestamp() });
@@ -767,12 +810,27 @@ export async function finalizeNight(roomCode: string, round: number) {
         const victimMatch = deathEntry.message.match(/\[([^\]]+)\]/);
         const victimName = victimMatch?.[1] ?? "alguém";
         const nameById = new Map(players.map((p) => [p.id, String(p.name ?? p.id)]));
-        const silentBots = players
+        const aliveBotIds = players
           .filter((p) => p.isBot && p.alive !== false && !p.eliminated && !p.expelled)
           .map((p) => p.id);
+        const chatDayRound = Math.max(1, round - 1);
+        const silentBots = await botIdsSilentInDayRound(roomCode, chatDayRound, aliveBotIds);
         await appendSilencioSuspeito(roomCode, round, silentBots, victimName, nameById).catch(
           console.error,
         );
+      }
+    }
+  }
+
+  if (room.soloMode === true) {
+    const humanDet = players.find((p) => !p.isBot);
+    if (humanDet && secrets[humanDet.id]?.role === "detetive") {
+      const afterDet = res.players[humanDet.id];
+      const wasOut =
+        Boolean(dawnPlayers[humanDet.id]?.eliminated) ||
+        Boolean(dawnPlayers[humanDet.id]?.expelled);
+      if (afterDet && (afterDet.eliminated || afterDet.expelled) && !wasOut) {
+        await markDetectiveEliminatedIfNeeded(roomCode, "night", round).catch(console.error);
       }
     }
   }
@@ -936,7 +994,7 @@ export async function finalizeNight(roomCode: string, round: number) {
     await voteAnnounceBatch.commit();
   }
 
-  if (await endGameApocalypseIfNoHumans(roomCode, round)) {
+  if (await markApocalypseRoboIfNeeded(roomCode, round)) {
     return;
   }
 
@@ -944,13 +1002,26 @@ export async function finalizeNight(roomCode: string, round: number) {
 }
 
 /** Encerra o dia automaticamente quando todos os elegíveis já constam no doc de votos. */
-export async function maybeFinalizeDayIfAllVotesIn(roomCode: string, round: number): Promise<void> {
+export async function maybeFinalizeDayIfAllVotesIn(
+  roomCode: string,
+  round: number,
+  opts?: { allowSoloBotsOnly?: boolean },
+): Promise<void> {
   const roomRef = db.collection("rooms").doc(roomCode);
   const roomSnap = await roomRef.get();
   const room = roomSnap.data() ?? {};
   if (room.status !== "day" || room.votingOpen === false) return;
+  if (room.apocalipseRoboPendingDay === true) return;
 
   const players = await loadPlayers(roomCode);
+  if (countLivingHumans(players) === 0) {
+    const soloDetGhost =
+      room.soloMode === true && room.detectiveEliminatedAt != null;
+    if (!soloDetGhost) {
+      await markApocalypseRoboIfNeeded(roomCode, round, players);
+      return;
+    }
+  }
   const eligible = players.filter((p) => canSubmitExpulsionVote(p));
   if (eligible.length === 0) {
     await finalizeDay(roomCode, round);
@@ -960,7 +1031,21 @@ export async function maybeFinalizeDayIfAllVotesIn(roomCode: string, round: numb
   const voteSnap = await roomRef.collection("votes").doc(String(round)).get();
   const votesDoc = voteSnap.data() ?? {};
   const allIn = eligible.every((p) => p.id && Object.hasOwn(votesDoc, p.id));
-  if (allIn) await finalizeDay(roomCode, round);
+  if (allIn) {
+    await finalizeDay(roomCode, round);
+    return;
+  }
+
+  // Modo Detetive: só apura sem voto do detetive quando o jogador pede (soloTryCloseDay / advanceDay).
+  if (opts?.allowSoloBotsOnly === true && room.soloMode === true) {
+    const botEligible = eligible.filter((p) => p.isBot);
+    if (
+      botEligible.length > 0 &&
+      botEligible.every((p) => p.id && Object.hasOwn(votesDoc, p.id))
+    ) {
+      await finalizeDay(roomCode, round);
+    }
+  }
 }
 
 export async function finalizeDay(roomCode: string, round: number) {
@@ -968,7 +1053,8 @@ export async function finalizeDay(roomCode: string, round: number) {
   const roomSnap = await roomRef.get();
   const room = roomSnap.data() ?? {};
 
-  if (await endGameApocalypseIfNoHumans(roomCode, round)) return;
+  if (room.apocalipseRoboPendingDay === true) return;
+  if (await markApocalypseRoboIfNeeded(roomCode, round)) return;
 
   if (room.status !== "day" || room.votingOpen === false) return;
 
@@ -1001,7 +1087,8 @@ export async function finalizeDay(roomCode: string, round: number) {
       "saciPlayerId" in (roomAfterVoid.pendingSaciGorro as object);
     if (!roomAfterVoid.pendingBrasChoice && !gorroPending) {
       const nextRound = voteRound + 1;
-      await roomRef.update({ pendingNightStart: true, pendingNightRound: nextRound });
+      const { advanceToNextNightOrAuto } = await import("./detectiveElimination.js");
+      await advanceToNextNightOrAuto(roomCode, round, room);
     }
     return;
   }
@@ -1023,12 +1110,14 @@ export async function finalizeDay(roomCode: string, round: number) {
     if (s) roleByPlayerId[p.id] = s.role;
   }
 
+  const eligibleVoters = players.filter((p) => canSubmitExpulsionVote(p));
   const brasId = players.find((p) => secrets[p.id]?.role === "bras_cubas")?.id ?? null;
   const tally = tallyExpulsionVotes(votes, {
     doubleVotesOnBras: Boolean(room.saciActedLastNight),
     brasPlayerId: brasId,
     enchantedVoterIds: new Set(players.filter((p) => p.enchanted).map((p) => p.id)),
     roleByPlayerId,
+    eligibleVoterCount: eligibleVoters.length,
   });
 
   if (tally.expelledId) {
@@ -1104,11 +1193,14 @@ export async function finalizeDay(roomCode: string, round: number) {
       ...(isBotBras ? { individualObjectiveMet: true } : {}),
     });
     const isHumanBras = role === "bras_cubas" && !isBotBras;
+    const expName = String(expelled.name ?? expelled.id);
     const msg = isHumanBras
-      ? brasExpulsionTeaseMessage(String(expelled.name ?? expelled.id))
-      : role === "bras_cubas"
-        ? brasToloRevealEndMessage(String(expelled.name ?? expelled.id))
-        : `A cidade votou pela expulsão de: ${expelled.name}.`;
+      ? brasExpulsionTeaseMessage(expName)
+      : role === "detetive" && room.soloMode === true
+        ? DETECTIVE_EXPULSION_PUBLIC_LOG_PT(expName)
+        : role === "bras_cubas"
+          ? brasToloRevealEndMessage(expName)
+          : `A cidade votou pela expulsão de: ${expelled.name}.`;
     batch.set(roomRef.collection("publicLogEntries").doc(), {
       round,
       type: role === "bras_cubas" ? "special" : "expulsion",
@@ -1223,7 +1315,11 @@ export async function finalizeDay(roomCode: string, round: number) {
     }
   }
 
-  if (await endGameApocalypseIfNoHumans(roomCode, voteRound)) return;
+  if (room.soloMode === true && tally.expelledId && secrets[tally.expelledId]?.role === "detetive") {
+    await markDetectiveEliminatedIfNeeded(roomCode, "vote", voteRound).catch(console.error);
+  }
+
+  if (await markApocalypseRoboIfNeeded(roomCode, voteRound)) return;
 
   if (isBotBrasExpelled) {
     await grantObjectiveMvp(roomCode, tally.expelledId!, round).catch(console.error);
@@ -1237,7 +1333,7 @@ export async function finalizeDay(roomCode: string, round: number) {
     if (await tryEndGameCollective(roomCode, round, room)) {
       return;
     }
-    const nextRound = round + 1;
-    await roomRef.update({ pendingNightStart: true, pendingNightRound: nextRound });
+    const { advanceToNextNightOrAuto } = await import("./detectiveElimination.js");
+    await advanceToNextNightOrAuto(roomCode, round, room);
   }
 }

@@ -14,10 +14,12 @@ export interface VoteTallyOptions {
   enchantedVoterIds?: Set<string>;
   /** roleId por jogador para validar encantamento. */
   roleByPlayerId?: Record<string, RoleId>;
+  /** Quem pode votar nesta rodada; expulsão exige maioria absoluta (> metade). */
+  eligibleVoterCount?: number;
 }
 
 /**
- * Conta votos; empate → sem expulsão (`expelledId` null).
+ * Conta votos; empate ou sem maioria absoluta → sem expulsão (`expelledId` null).
  */
 export function tallyExpulsionVotes(
   votes: VoteEntry[],
@@ -46,5 +48,12 @@ export function tallyExpulsionVotes(
     .filter(([, c]) => c === best)
     .map(([id]) => id);
   if (leaders.length !== 1) return { expelledId: null, counts };
+
+  const eligible = options.eligibleVoterCount ?? 0;
+  if (eligible > 0) {
+    const minToExpel = Math.floor(eligible / 2) + 1;
+    if (best < minToExpel) return { expelledId: null, counts };
+  }
+
   return { expelledId: leaders[0]!, counts };
 }

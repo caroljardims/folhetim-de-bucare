@@ -1,0 +1,652 @@
+/* ── Caderno de Evidências — physical notebook on dark table ── */
+
+.caderno-wrap {
+  margin: 12px 0 0;
+  width: 100%;
+}
+
+.caderno {
+  --caderno-bg: #f5edd6;
+  --caderno-ink: #2c1810;
+  --caderno-ink-muted: #8b7355;
+  --caderno-ink-red: #8b2020;
+  --caderno-ink-blue: #1a3a6b;
+  --caderno-line: rgba(200, 180, 138, 0.4);
+  --caderno-font-hand: "Caveat", "Patrick Hand", cursive;
+  --caderno-font-type: "Special Elite", "Courier New", monospace;
+  --caderno-line-height: 24px;
+
+  position: relative;
+  border-radius: 4px;
+  box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  font-family: var(--caderno-font-hand);
+  color: var(--caderno-ink);
+}
+
+.caderno__paper {
+  background-color: var(--caderno-bg);
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent calc(var(--caderno-line-height) - 1px),
+    var(--caderno-line) calc(var(--caderno-line-height) - 1px),
+    var(--caderno-line) var(--caderno-line-height)
+  );
+  position: relative;
+}
+
+.caderno__paper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+/* ── Collapsed bar ── */
+
+.caderno__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  z-index: 1;
+  font-family: inherit;
+  color: inherit;
+}
+
+.caderno__bar-summary {
+  font-family: var(--caderno-font-type);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--caderno-ink-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.caderno__bar-chev {
+  font-size: 12px;
+  color: var(--caderno-ink-muted);
+  flex-shrink: 0;
+}
+
+/* ── Expand / collapse body ── */
+
+.caderno__body-outer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms ease-out;
+}
+
+.caderno--expanded .caderno__body-outer {
+  grid-template-rows: 1fr;
+}
+
+.caderno__body-inner {
+  overflow: hidden;
+}
+
+.caderno__body-scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+  position: relative;
+  z-index: 1;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Stamps ── */
+
+.caderno-stamp {
+  display: inline-block;
+  padding: 4px 10px;
+  font-family: var(--caderno-font-type);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 3px double currentColor;
+  transform: rotate(-0.8deg);
+  line-height: 1.2;
+}
+
+.caderno-stamp--title {
+  color: var(--caderno-ink-red);
+  font-size: 12px;
+}
+
+.caderno-stamp--blue {
+  color: var(--caderno-ink-blue);
+  font-size: 10px;
+  transform: rotate(0.6deg);
+}
+
+.caderno-stamp--theory {
+  color: var(--caderno-ink-blue);
+  font-size: 9px;
+  transform: rotate(-0.4deg);
+  margin-bottom: 6px;
+}
+
+.caderno-stamp--revealed {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  color: var(--caderno-ink-red);
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  border: 3px double var(--caderno-ink-red);
+  padding: 6px 14px;
+  opacity: 0.88;
+  pointer-events: none;
+  z-index: 2;
+  white-space: nowrap;
+}
+
+/* ── Empty state ── */
+
+.caderno-empty {
+  text-align: center;
+  padding: 20px 12px 8px;
+  font-size: 1.15rem;
+  line-height: 1.5;
+  color: var(--caderno-ink-muted);
+}
+
+.caderno-empty p {
+  margin: 0 0 4px;
+}
+
+/* ── Mapa de Bucaré ── */
+
+.caderno-mapa {
+  margin: 12px 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px dashed var(--caderno-line);
+}
+
+.caderno-mapa__list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.caderno-mapa__item {
+  font-size: 1.05rem;
+  line-height: var(--caderno-line-height);
+  margin: 0;
+}
+
+.caderno-mapa__round {
+  font-family: var(--caderno-font-type);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.caderno-mapa__loc {
+  font-family: var(--caderno-font-hand);
+}
+
+.caderno-mapa__result--muted {
+  font-style: italic;
+  color: var(--caderno-ink-muted);
+}
+
+.caderno-mapa__result--normal {
+  font-weight: 400;
+}
+
+.caderno-mapa__result--alert {
+  font-weight: 700;
+  color: #a03030;
+}
+
+/* ── Suspect cards ── */
+
+.caderno-suspects {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.caderno-suspect {
+  position: relative;
+  border-top: 1px solid var(--caderno-line);
+  padding-top: 8px;
+}
+
+.caderno-suspect--expelled {
+  opacity: 0.92;
+}
+
+.caderno-suspect__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  position: relative;
+}
+
+.caderno-suspect__glyph {
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  font-size: 1rem;
+  color: var(--caderno-ink);
+}
+
+.caderno-suspect__name-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.caderno-suspect__name {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.caderno-suspect__identity {
+  display: block;
+  font-family: var(--caderno-font-type);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--caderno-ink-red);
+  margin-top: 2px;
+}
+
+.caderno-suspect__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.caderno-suspect__dots {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 72px;
+}
+
+.caderno-suspect__pista-count {
+  font-family: var(--caderno-font-type);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--caderno-ink-muted);
+  white-space: nowrap;
+}
+
+.caderno-suspect__chev {
+  font-size: 11px;
+  color: var(--caderno-ink-muted);
+  margin-left: 4px;
+}
+
+.caderno-suspect__body-outer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms ease-out;
+}
+
+.caderno-suspect--open .caderno-suspect__body-outer {
+  grid-template-rows: 1fr;
+}
+
+.caderno-suspect__body-inner {
+  overflow: hidden;
+}
+
+.caderno-suspect__body {
+  padding: 4px 4px 12px 30px;
+  border-top: 1px dashed var(--caderno-line);
+  margin-top: 4px;
+}
+
+/* ── Evidence entries ── */
+
+.caderno-evidence {
+  position: relative;
+  padding: 6px 8px 6px 0;
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+
+.caderno-evidence--new {
+  animation: caderno-fresh-ink 2s ease-out;
+}
+
+.caderno-evidence--new::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--caderno-ink-red);
+}
+
+@keyframes caderno-fresh-ink {
+  0% {
+    background-color: rgba(255, 220, 100, 0.55);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.caderno-evidence__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.caderno-evidence__round {
+  font-family: var(--caderno-font-type);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.caderno-evidence__weight-label {
+  font-family: var(--caderno-font-type);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--caderno-ink-muted);
+}
+
+.caderno-evidence__desc {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.4;
+  padding-left: 2px;
+}
+
+/* ── Weight icons ── */
+
+.caderno-weight {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.caderno-weight--forte {
+  border-radius: 50%;
+  background: var(--caderno-ink-red);
+  color: #f5edd6;
+  font-family: var(--caderno-font-type);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.caderno-weight--moderado {
+  font-size: 14px;
+  color: var(--caderno-ink-red);
+}
+
+.caderno-weight--leve {
+  border: 2px solid var(--caderno-ink-red);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.caderno-weight--dot {
+  width: 10px;
+  height: 10px;
+}
+
+.caderno-weight--dot.caderno-weight--forte {
+  width: 10px;
+  height: 10px;
+  font-size: 8px;
+}
+
+.caderno-weight--dot.caderno-weight--leve {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}
+
+.caderno-weight--dot.caderno-weight--moderado {
+  font-size: 11px;
+}
+
+/* ── Investigation notes ── */
+
+.caderno-notes {
+  width: 100%;
+  min-height: calc(var(--caderno-line-height) * 4);
+  padding: 0;
+  margin: 4px 0 12px;
+  border: none;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  font-family: var(--caderno-font-hand);
+  font-size: 1.1rem;
+  line-height: var(--caderno-line-height);
+  color: var(--caderno-ink);
+  field-sizing: content;
+}
+
+.caderno-notes::placeholder {
+  font-style: italic;
+  color: var(--caderno-ink-muted);
+  opacity: 0.65;
+}
+
+.caderno-notes:focus {
+  outline: none;
+}
+
+/* ── Theory selector ── */
+
+.caderno-theory {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--caderno-line);
+}
+
+.caderno-theory__select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 4px 20px 4px 0;
+  border: none;
+  border-bottom: 2px solid var(--caderno-ink);
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--caderno-font-hand);
+  font-size: 1.15rem;
+  color: var(--caderno-ink);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%232C1810' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 2px center;
+}
+
+.caderno-theory__select:focus {
+  outline: none;
+  border-bottom-color: var(--caderno-ink-blue);
+}
+
+.caderno-theory__select option {
+  font-family: var(--caderno-font-hand);
+  background: var(--caderno-bg);
+  color: var(--caderno-ink);
+}
+
+/* ── Accusation screen — A verdade de Bucaré ── */
+
+.detective-end--accusation {
+  position: relative;
+  inset: unset;
+  z-index: 1;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  align-self: stretch;
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 4px 0 8px;
+  text-align: center;
+  background: transparent;
+}
+
+.detective-end__title {
+  font-family: var(--ff-cordel);
+  font-size: clamp(1.45rem, 5vw, 1.85rem);
+  letter-spacing: 0.06em;
+  color: var(--ouro-claro);
+  margin: 0 0 8px;
+  line-height: 1.15;
+}
+
+.detective-end__subtitle {
+  font-family: var(--ff-mono);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+  color: var(--texto-poeira);
+  margin: 0 auto 14px;
+  max-width: 28em;
+}
+
+@media (max-width: 480px) {
+  .detective-end__subtitle {
+    font-size: 0.72rem;
+    line-height: 1.4;
+    margin-bottom: 12px;
+  }
+}
+
+.caderno-wrap--final {
+  margin: 0;
+  width: 100%;
+  text-align: left;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.caderno--final {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    2px 4px 12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(44, 24, 16, 0.08);
+}
+
+.caderno--final .caderno__paper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.caderno__body-scroll--final {
+  flex: 1;
+  min-height: 0;
+  max-height: min(58vh, 520px);
+  padding: 16px 16px 10px;
+}
+
+.caderno-final-lead {
+  margin: 10px 0 14px;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: var(--caderno-ink-muted);
+  font-style: italic;
+}
+
+.caderno-suspects--final {
+  gap: 14px;
+}
+
+.caderno-suspect--accusation {
+  border-top: none;
+  padding-top: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--caderno-line);
+}
+
+.caderno-suspect--accusation:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.caderno-suspect__head--static {
+  cursor: default;
+  padding: 2px 0 0;
+}
+
+.caderno-theory--accusation {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: none;
+}
+
+.caderno-final-foot {
+  text-align: center;
+  font-family: var(--caderno-font-type);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--caderno-ink-muted);
+  margin: 14px 0 2px;
+  opacity: 0.75;
+}
+
+.detective-final-cta {
+  margin-top: 24px;
+  align-self: center;
+  width: 100%;
+  max-width: 320px;
+}
+
+.detective-final-cta .btn-title-row {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.fase--fim.page:has(.detective-end--accusation) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.fase--fim.page:has(.detective-end--accusation) .detective-end--accusation {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}

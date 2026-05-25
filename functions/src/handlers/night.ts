@@ -270,8 +270,12 @@ export const startNight = onCall(async (req) => {
   await expireSaciGorroIfPending(code);
   await roomRef.update({ pendingNightStart: false, pendingNightRound: null });
   await startNightSequence(code, nextRound);
-  await processBotNightActions(code, nextRound);
-  await maybeFinalizeNight(code, nextRound);
+  const soloDetAlive =
+    room.soloMode === true && room.detectiveEliminatedAt == null;
+  if (!soloDetAlive) {
+    await processBotNightActions(code, nextRound);
+    await maybeFinalizeNight(code, nextRound);
+  }
   return { ok: true };
 });
 

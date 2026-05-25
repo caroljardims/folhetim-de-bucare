@@ -206,6 +206,9 @@ export const startSoloDetectiveGame = onCall(async (req) => {
     detectiveScore: null,
     detectivePhase: null,
     criaturaRemovedCount: 0,
+    apocalipseRoboDetected: false,
+    apocalipseRoboPendingDay: false,
+    detectiveGhostObservation: false,
     createdAt: FieldValue.serverTimestamp(),
   });
 
@@ -245,8 +248,7 @@ export const startSoloDetectiveGame = onCall(async (req) => {
   await ensurePlayerPrivateDoc(code, humanPid, uid);
   try {
     await startNightSequence(code, 1);
-    await processBotNightActions(code, 1);
-    await maybeFinalizeNight(code, 1);
+    // Noite 1 fica na tela do detetive; bots só agem após markNightReady / ações.
   } catch (e: unknown) {
     console.error("startSoloDetectiveGame: pós-commit", e);
     const msg = e instanceof Error ? e.message : String(e);
@@ -339,6 +341,9 @@ export const startGame = onCall(async (req) => {
     nightPhaseIndex: 0,
     gameTablePlayerCount: players.length,
     criaturaRemovedCount: 0,
+    apocalipseRoboDetected: false,
+    apocalipseRoboPendingDay: false,
+    apocalipseRoboAt: FieldValue.delete(),
     ...(players.length === 5
       ? { fiveTableMoradorIds: moradorIdsAtStart }
       : { fiveTableMoradorIds: FieldValue.delete() }),
@@ -556,6 +561,13 @@ export const restartGame = onCall(async (req) => {
     fiveTableMoradorIds: FieldValue.delete(),
     voidedDayExpulsionRound: FieldValue.delete(),
     criaturaRemovedCount: 0,
+    apocalipseRoboDetected: false,
+    apocalipseRoboPendingDay: false,
+    apocalipseRoboAt: FieldValue.delete(),
+    detectiveEliminatedAt: FieldValue.delete(),
+    detectiveEliminationCause: FieldValue.delete(),
+    detectiveGhostObservation: false,
+    detectiveGhostObservationRound: FieldValue.delete(),
   });
 
   await batch.commit();

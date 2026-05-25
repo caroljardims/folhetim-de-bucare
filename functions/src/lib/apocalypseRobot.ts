@@ -12,6 +12,12 @@ import { grantAldeaoObjectiveIfMoradoresWon } from "./playerPrivateScore.js";
 export const APOCALYPSE_ROBOT_CHRONICLE_PT =
   "As criaturas fugiram. Os moradores sumiram. Algo que não veio do rio, do mato ou do sertão desceu sobre Bucaré sem avisar. Não tinha gorro vermelho. Não tinha escama. Não tinha maldição. Tinha circuito. Os robôs tomaram a praça, abduzindo tudo que era carne, folclore ou mistério — e a Bucaré ficou olhando, sem saber o que fazer com raízes que nunca viram isso antes. O cordel não tem estrofe pra apocalipse robô.";
 
+/** Texto da tela cheia antes do fim de jogo (type: apocalipse_robo). */
+export const APOCALYPSE_ROBO_INTERSTITIAL_PT =
+  "Não foi o lobisomem. Não foi a Iara. Não foi ninguém que o folclore conhece. Os robôs desceram sobre Bucaré, abduzindo criatura e morador sem distinção — o folclore e a cidade, levados juntos pro mesmo lugar desconhecido. A praça ficou vazia. A Bucaré floresceu amarelo sem ter ninguém pra ver. Apocalipse Robô: o único inimigo que o sertão não tinha lenda pra enfrentar.";
+
+export const APOCALYPSE_OBSERVATION_MS = 60_000;
+
 type LivingPlayerRow = {
   id: string;
   isBot?: boolean;
@@ -27,18 +33,53 @@ export function countLivingHumans(players: LivingPlayerRow[]): number {
   ).length;
 }
 
-/** Encerra com Apocalipse Robô se não restar nenhum humano na cidade. */
-export async function endGameApocalypseIfNoHumans(
+export function isApocalypseRobo(players: LivingPlayerRow[]): boolean {
+  return countLivingHumans(players) === 0;
+}
+
+/**
+ * Marca Apocalipse Robô pendente — dia de observação antes do fim.
+ * Retorna true se a condição está ativa (já marcada ou recém-marcada).
+ */
+export async function markApocalypseRoboIfNeeded(
   roomCode: string,
   round: number,
+  playersIn?: LivingPlayerRow[],
 ): Promise<boolean> {
   const roomRef = db.collection("rooms").doc(roomCode);
   const roomSnap = await roomRef.get();
   const room = roomSnap.data() ?? {};
+  if (room.soloMode === true) return false;
   if (room.status === "ended") return true;
+  if (room.apocalipseRoboDetected === true) return true;
+
+  const players = playersIn ?? (await loadPlayers(roomCode));
+  if (!isApocalypseRobo(players)) return false;
+
+  const now = Date.now();
+  await roomRef.update({
+    apocalipseRoboDetected: true,
+    apocalipseRoboPendingDay: true,
+    apocalipseRoboAt: now,
+    votingOpen: false,
+    pendingNightStart: FieldValue.delete(),
+    pendingNightRound: FieldValue.delete(),
+    pendingVotingFinalize: FieldValue.delete(),
+  });
+  return true;
+}
+
+/** Encerra a partida após o dia de observação do Apocalipse Robô. */
+export async function completeApocalypseRoboEnd(roomCode: string, round: number): Promise<boolean> {
+  const roomRef = db.collection("rooms").doc(roomCode);
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.data() ?? {};
+  if (room.soloMode === true) return false;
+  if (room.status === "ended") return true;
+  if (!room.apocalipseRoboDetected && !room.apocalipseRoboPendingDay) return false;
 
   const [players, secrets] = await Promise.all([loadPlayers(roomCode), loadSecrets(roomCode)]);
-  if (countLivingHumans(players) > 0) return false;
+  if (!isApocalypseRobo(players)) return false;
 
   const wpCheck: Record<string, WinPlayerSnapshot> = {};
   for (const p of players) {
@@ -83,13 +124,27 @@ export async function endGameApocalypseIfNoHumans(
     votingOpen: false,
     pendingNightStart: false,
     pendingNightRound: FieldValue.delete(),
+    apocalipseRoboPendingDay: false,
     ...(isSolo
-      ? { detectivePhase: "accusation", detectiveGuesses: null, detectiveScore: null }
+      ? {
+          detectivePhase: "done",
+          detectiveGuesses: null,
+          detectiveScore: null,
+        }
       : { revealedRoles }),
     ...(detail.reason === "moradores_plaza_tie"
       ? { collectiveEndKind: "moradores_plaza_tie" }
       : { collectiveEndKind: FieldValue.delete() }),
   });
+
+  endBatch.set(roomRef.collection("publicLogEntries").doc(), {
+    round,
+    type: "apocalipse_robo",
+    message: APOCALYPSE_ROBO_INTERSTITIAL_PT,
+    timestamp: Date.now(),
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
   const endMsg =
     forcedWinner === "bots" ? APOCALYPSE_ROBOT_CHRONICLE_PT : collectiveWinChronicleMessagePt(detail);
   if (endMsg) {
@@ -101,6 +156,7 @@ export async function endGameApocalypseIfNoHumans(
       createdAt: FieldValue.serverTimestamp(),
     });
   }
+
   await endBatch.commit();
 
   if (forcedWinner === "moradores") {
@@ -112,4 +168,13 @@ export async function endGameApocalypseIfNoHumans(
     await finalizeMvpLedgerIfNeeded(roomCode).catch(console.error);
   }
   return true;
+}
+
+/** @deprecated Use markApocalypseRoboIfNeeded + completeApocalypseRoboEnd */
+export async function endGameApocalypseIfNoHumans(
+  roomCode: string,
+  round: number,
+): Promise<boolean> {
+  if (await markApocalypseRoboIfNeeded(roomCode, round)) return true;
+  return false;
 }

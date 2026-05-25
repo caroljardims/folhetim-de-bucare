@@ -15,6 +15,8 @@ import { stablePlayerGlyph } from "../../lib/playerGlyph.js";
 import { ROLE_DISPLAY, ROLE_LORE, ROLE_XILO, RoleLoreContent } from "../../lib/roleStories.js";
 import type { PlayerPrivateDoc } from "../../hooks/useMyPlayerPrivate.js";
 import { DetectiveLocationNight } from "../detective/DetectiveLocationNight.js";
+import { DetectiveGhostObservationPanel } from "../day/DetectiveGhostObservationPanel.js";
+import { isDetectiveGhostObservation } from "../../lib/detectiveElimination.js";
 import type { BucareLocation } from "../../lib/detectiveLocations.js";
 
 type ActionOpt = { value: string; label: string };
@@ -133,7 +135,12 @@ export function NightScreen({
 }: NightScreenProps) {
   const meNight = players.find((p) => p.id === playerId);
   const myRoleIsPending = !!(myRole && room.nightPendingRoles?.includes(myRole));
-  const detectiveLocationTurn = soloMode && myRole === "detetive" && myRoleIsPending;
+  const myPlayer = players.find((p) => p.id === playerId);
+  const detectiveGhostObservation = isDetectiveGhostObservation(room);
+  const showDetectiveGhostPanel =
+    detectiveGhostObservation && myPlayer && !myPlayer.isBot;
+  const detectiveLocationTurn =
+    soloMode && myRole === "detetive" && myRoleIsPending && !detectiveGhostObservation;
   const needsAlignment =
     (myRole === "curupira" || myRole === "boitata") &&
     room.round === 1 &&
@@ -537,12 +544,18 @@ export function NightScreen({
         </div>
       )}
 
+      {showDetectiveGhostPanel && (
+        <DetectiveGhostObservationPanel
+          room={room}
+          roomCode={roomCode}
+          cause={room.detectiveEliminationCause}
+          run={run}
+          busy={busy}
+        />
+      )}
+
       <div className="noite-footer">
-        {detectiveLocationTurn ? (
-          <button type="button" className="btn-noite" disabled>
-            {nightActionSent ? "Aguardando o amanhecer…" : "Escolha um lugar e toque em Investigar"}
-          </button>
-        ) : myRoleIsPending ? (
+        {showDetectiveGhostPanel ? null : detectiveLocationTurn ? null : myRoleIsPending ? (
           <button
             type="button"
             className={`btn-noite${nightActionSent ? " vote-sent" : ""}`}

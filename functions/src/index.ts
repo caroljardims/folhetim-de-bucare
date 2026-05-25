@@ -14,6 +14,7 @@ export {
 
 export {
   submitDetectiveGuesses,
+  completeDetectiveGhostObservation,
   completeDetectiveEndFlow,
 } from "./handlers/detective.js";
 
@@ -25,7 +26,13 @@ export {
   submitNightSuspicion,
 } from "./handlers/night.js";
 
-export { submitVote, sendChatMessage, advanceDay } from "./handlers/day.js";
+export {
+  submitVote,
+  sendChatMessage,
+  advanceDay,
+  soloTryCloseDay,
+  completeApocalypseRobo,
+} from "./handlers/day.js";
 
 export {
   requestVotingFinalize,

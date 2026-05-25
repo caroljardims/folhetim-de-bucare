@@ -1,0 +1,323 @@
+/* ── Modo Detetive — setup & location flow (visual only) ── */
+
+.page--detective-setup {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+.detective-setup-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 0 32px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.page--detective-setup .h-display {
+  margin-bottom: 8px;
+}
+
+.page--detective-setup .copy-muted {
+  margin: 0 0 20px;
+}
+
+/* ── Mode selection cards ── */
+
+.detective-mode-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 0 24px;
+  width: 100%;
+}
+
+.detective-mode-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 20px 24px;
+  text-align: left;
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  border-radius: var(--r-md, 12px);
+  background: var(--ink-fume, rgba(28, 20, 12, 0.92));
+  color: var(--texto-claro, var(--ink-cream));
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.detective-mode-card:hover {
+  border-color: rgba(212, 162, 76, 0.75);
+  box-shadow: 0 0 24px rgba(212, 162, 76, 0.1);
+}
+
+.detective-mode-card:active {
+  transform: scale(0.99);
+}
+
+.detective-mode-card__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.detective-mode-card__emoji {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.detective-mode-card__title {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ouro-claro);
+}
+
+.detective-mode-card__desc {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--texto-poeira, var(--ink-muted));
+  padding-left: 2px;
+}
+
+.detective-mode-card__badge {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  padding: 4px 10px;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f5edd6;
+  background: #6b1a1a;
+  border: 1px solid rgba(139, 32, 32, 0.6);
+  border-radius: 3px;
+  transform: rotate(-2deg);
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.detective-mode-card--challenge {
+  padding-right: 88px;
+}
+
+.detective-mode-card--challenge:hover .detective-mode-card__badge {
+  animation: detective-badge-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes detective-badge-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: rotate(-2deg) scale(1.04);
+  }
+}
+
+.detective-guide-link {
+  background: none;
+  border: none;
+  color: var(--ocre-sertao);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 8px 0;
+  align-self: flex-start;
+}
+
+/* ── Name screen ── */
+
+.detective-cordel-rule {
+  text-align: center;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  letter-spacing: 0.35em;
+  color: rgba(212, 162, 76, 0.6);
+  margin: 0 0 20px;
+  max-width: 200px;
+  align-self: center;
+  width: 100%;
+}
+
+.detective-input-wrap {
+  position: relative;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.detective-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.detective-input.field-input {
+  padding-left: 44px;
+}
+
+.detective-input.field-input:focus {
+  border-color: var(--ouro-bucare, rgba(212, 162, 76, 0.85));
+  box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.25);
+}
+
+.detective-flow-cta {
+  margin-top: 24px;
+  width: 100%;
+}
+
+.detective-flow-cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.detective-flow-cta:disabled:hover {
+  filter: none;
+}
+
+.detective-atmosphere {
+  margin: 20px 0 0;
+  text-align: center;
+  font-family: var(--type-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: rgba(212, 162, 76, 0.55);
+}
+
+.page--detective-setup .field-label {
+  margin-bottom: 8px;
+}
+
+/* ── Location selection ── */
+
+.detective-location-night {
+  margin: 0 0 8px;
+  width: 100%;
+}
+
+.detective-location-night__subtitle {
+  text-align: center;
+  margin: 0 0 18px;
+  font-size: 0.9rem;
+  color: var(--texto-poeira, var(--ink-muted));
+}
+
+.detective-location-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.detective-location-grid--has-selection .detective-location-card:not(.detective-location-card--selected) {
+  opacity: 0.6;
+}
+
+.detective-location-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 72px;
+  padding: 14px 8px;
+  border: 1px solid rgba(201, 169, 110, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--texto-claro, var(--ink-cream));
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease,
+    opacity 0.2s ease;
+}
+
+.detective-location-card:hover:not(:disabled) {
+  border-color: rgba(201, 169, 110, 0.45);
+}
+
+.detective-location-card--selected {
+  border-color: rgba(201, 169, 110, 1);
+  background: rgba(201, 169, 110, 0.1);
+  transform: scale(1.02);
+  opacity: 1 !important;
+}
+
+.detective-location-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.detective-location-card__icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.detective-location-card__name {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.detective-location-night__cta {
+  width: 100%;
+  margin-top: 24px;
+}
+
+.detective-location-night__cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: linear-gradient(180deg, rgba(184, 115, 46, 0.35), rgba(110, 58, 31, 0.25));
+  color: rgba(255, 245, 224, 0.45);
+  box-shadow: none;
+}
+
+.detective-location-night__cta:disabled:hover {
+  filter: none;
+}
+
+.detective-location-night__cta:not(:disabled) .btn-title-row {
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/* Hide redundant footer hint when location picker is active */
+.screen--noite:has(.detective-location-night) .noite-footer {
+  display: none;
+}
+
+@media (max-width: 360px) {
+  .detective-location-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .detective-mode-card {
+    padding: 18px 16px;
+  }
+}

@@ -10,6 +10,7 @@ import {
 } from "../lib/detectiveTypes.js";
 import { finalizeMvpLedgerIfNeeded } from "../lib/endGameScoring.js";
 import { updateDetectiveUserStats } from "../lib/detectiveStats.js";
+import { completeDetectiveGhostObservation as finishDetectiveGhostObservation } from "../lib/detectiveElimination.js";
 
 const GUESSABLE_ROLES = new Set<RoleId>([
   "lobisomem", "saci", "mula", "boto", "iara", "geni", "bras_cubas", "cangaceiro",
@@ -27,7 +28,6 @@ export const submitDetectiveGuesses = onCall(async (req) => {
   if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
   const room = roomSnap.data()!;
   if (room.soloMode !== true) throw new HttpsError("failed-precondition", "Não é Modo Detetive.");
-  if (room.status !== "ended") throw new HttpsError("failed-precondition", "Partida não encerrada.");
   if (room.detectivePhase !== "accusation") {
     throw new HttpsError("failed-precondition", "Acusação já enviada.");
   }
@@ -83,6 +83,29 @@ export const submitDetectiveGuesses = onCall(async (req) => {
   await finalizeMvpLedgerIfNeeded(code).catch(console.error);
 
   return { ok: true, detectiveScore };
+});
+
+export const completeDetectiveGhostObservation = onCall(async (req) => {
+  requireAuth(req);
+  const code = String(req.data?.roomCode ?? "").toUpperCase().trim();
+  if (!code) throw new HttpsError("invalid-argument", "Código inválido.");
+
+  const roomRef = db.collection("rooms").doc(code);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Sala não encontrada.");
+  const room = roomSnap.data()!;
+  if (room.soloMode !== true) throw new HttpsError("failed-precondition", "Não é Modo Detetive.");
+  if (room.detectiveGhostObservation !== true) {
+    throw new HttpsError("failed-precondition", "Observação não está ativa.");
+  }
+
+  const players = await loadPlayers(code);
+  const me = findPlayer(players, req);
+  if (!me || me.isBot) throw new HttpsError("permission-denied", "Apenas o detetive.");
+
+  const ok = await finishDetectiveGhostObservation(code);
+  if (!ok) throw new HttpsError("failed-precondition", "Não foi possível encerrar a observação.");
+  return { ok: true };
 });
 
 export const completeDetectiveEndFlow = onCall(async (req) => {

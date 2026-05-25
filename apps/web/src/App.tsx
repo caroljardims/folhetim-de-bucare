@@ -38,10 +38,22 @@ import { DEBUG_ROLE_LABELS } from "./debug/roleOptions.js";
 import { NIGHT_ROLE_ACTION_SECONDS } from "./lib/nightTurnConstants.js";
 import { LOCATION_LABEL_PT, pickRandomBucareLocation } from "./lib/detectiveLocations.js";
 import { mapCallableError } from "./lib/callableErrors.js";
-import type { PlayerDoc, SoloModeDifficulty, View } from "./types.js";
+import type { PlayerDoc, RoomDoc, SoloModeDifficulty, View } from "./types.js";
 import { navigateDetectiveGuide } from "./lib/detectiveRoute.js";
+import "./components/detective/detectiveFlow.css";
 import { BtnSpinner } from "./components/BtnSpinner.js";
 import { EndScreen } from "./components/screens/EndScreen.js";
+import { ApocalypseInterstitial } from "./components/screens/ApocalypseInterstitial.js";
+import { DetectiveEliminatedInterstitial } from "./components/screens/DetectiveEliminatedInterstitial.js";
+import {
+  apocalypseInterstitialMessage,
+  apocalypseInterstitialStorageKey,
+} from "./lib/apocalypseRobo.js";
+import {
+  detectiveEliminatedInterstitialStorageKey,
+  detectiveEliminatedIntroMessage,
+  isDetectiveGhostObservation,
+} from "./lib/detectiveElimination.js";
 import { AmanhecerScreen } from "./components/screens/AmanhecerScreen.js";
 import { AnoitecerScreen } from "./components/screens/AnoitecerScreen.js";
 import { DayScreen } from "./components/screens/DayScreen.js";
@@ -76,6 +88,12 @@ const DebugIntroChromeLazy = lazy(() => import("./debug/DebugIntroChrome.js"));
 const DetectiveEndFlowLazy = lazy(() =>
   import("./components/detective/DetectiveEndFlow.js").then((m) => ({
     default: m.DetectiveEndFlow,
+  })),
+);
+
+const SoloDetectiveEndOrchestratorLazy = lazy(() =>
+  import("./components/solo/SoloDetectiveEndOrchestrator.js").then((m) => ({
+    default: m.SoloDetectiveEndOrchestrator,
   })),
 );
 
@@ -187,6 +205,74 @@ export function App({ masterBootstrap }: AppProps = {}) {
   const inNightPhase =
     room?.status === "night" && !showBatismo && !showAnoitecer;
   const inEndedPhase = room?.status === "ended";
+
+  const apocalypseMsg = useMemo(() => apocalypseInterstitialMessage(publicLog), [publicLog]);
+  const [apocalypseInterstitialDone, setApocalypseInterstitialDone] = useState(false);
+
+  useEffect(() => {
+    if (room?.status !== "ended" || room?.winner !== "bots") {
+      setApocalypseInterstitialDone(false);
+      return;
+    }
+    const key = apocalypseInterstitialStorageKey(roomCode);
+    setApocalypseInterstitialDone(sessionStorage.getItem(key) === "1");
+  }, [room?.status, room?.winner, roomCode]);
+
+  const showApocalypseInterstitial =
+    room?.status === "ended" &&
+    room?.winner === "bots" &&
+    Boolean(apocalypseMsg) &&
+    !apocalypseInterstitialDone;
+
+  const showStandardEndScreens = room?.status === "ended" && !showApocalypseInterstitial;
+
+  const detectiveGhostObs = isDetectiveGhostObservation(room ?? ({} as RoomDoc));
+  const detectiveElimIntroKey = detectiveEliminatedInterstitialStorageKey(roomCode);
+  const [detectiveElimIntroDone, setDetectiveElimIntroDone] = useState(false);
+
+  useEffect(() => {
+    if (!room?.soloMode || room.detectivePhase !== "accusation" || detectiveGhostObs) {
+      setDetectiveElimIntroDone(false);
+      return;
+    }
+    if (room.detectiveEliminatedAt == null) {
+      setDetectiveElimIntroDone(true);
+      return;
+    }
+    setDetectiveElimIntroDone(sessionStorage.getItem(detectiveElimIntroKey) === "1");
+  }, [
+    room?.soloMode,
+    room?.detectivePhase,
+    room?.detectiveEliminatedAt,
+    detectiveGhostObs,
+    detectiveElimIntroKey,
+  ]);
+
+  const detectiveElimIntroMsg = useMemo(() => {
+    if (!room?.soloMode || room.detectiveEliminatedAt == null) return null;
+    const detName =
+      players.find((p) => !p.isBot)?.name?.trim() || "Detetive";
+    return detectiveEliminatedIntroMessage(detName, room.detectiveEliminationCause);
+  }, [room?.soloMode, room?.detectiveEliminatedAt, room?.detectiveEliminationCause, players]);
+
+  const showDetectiveEliminatedInterstitial =
+    Boolean(room?.soloMode) &&
+    room?.status !== "ended" &&
+    room?.detectivePhase === "accusation" &&
+    !detectiveGhostObs &&
+    room?.detectiveEliminatedAt != null &&
+    detectiveElimIntroMsg != null &&
+    !detectiveElimIntroDone;
+
+  const showSoloDetectiveEnd =
+    Boolean(room?.soloMode) && room?.status === "ended" && !showApocalypseInterstitial;
+
+  const showDetectiveEndFlowMidGame =
+    Boolean(room?.soloMode) &&
+    room?.status !== "ended" &&
+    room?.detectivePhase === "accusation" &&
+    !detectiveGhostObs &&
+    !showDetectiveEliminatedInterstitial;
 
   function confirmBatismo() {
     setBatismoSeen(true);
@@ -1033,37 +1119,54 @@ export function App({ masterBootstrap }: AppProps = {}) {
               <span className="session-label">modo detetive</span>
               <span className="top-bar-spacer" />
             </div>
-            <h2 className="h-display">Como você quer jogar?</h2>
-            <div className="detective-mode-cards">
-              <button
-                type="button"
-                className="detective-mode-card primary-btn"
-                onClick={() => {
-                  setSoloModeDifficulty("story");
-                  setDetectiveName(user?.displayName?.trim() ?? "");
-                  setView("detectiveName");
-                }}
-              >
-                <span className="btn-title">📖 Modo História</span>
-                <span className="btn-sub">O caderno se preenche sozinho. Foque na narrativa.</span>
+            <div className="detective-setup-body">
+              <h2 className="h-display">Como você quer jogar?</h2>
+              <div className="detective-mode-cards">
+                <button
+                  type="button"
+                  className="detective-mode-card"
+                  onClick={() => {
+                    setSoloModeDifficulty("story");
+                    setDetectiveName(user?.displayName?.trim() ?? "");
+                    setView("detectiveName");
+                  }}
+                >
+                  <div className="detective-mode-card__row">
+                    <span className="detective-mode-card__emoji" aria-hidden>
+                      📖
+                    </span>
+                    <span className="detective-mode-card__title">Modo História</span>
+                  </div>
+                  <p className="detective-mode-card__desc">
+                    O caderno se preenche sozinho. Foque na narrativa.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  className="detective-mode-card detective-mode-card--challenge"
+                  onClick={() => {
+                    setSoloModeDifficulty("investigation");
+                    setDetectiveName(user?.displayName?.trim() ?? "");
+                    setView("detectiveName");
+                  }}
+                >
+                  <span className="detective-mode-card__badge">Desafio</span>
+                  <div className="detective-mode-card__row">
+                    <span className="detective-mode-card__emoji" aria-hidden>
+                      🔍
+                    </span>
+                    <span className="detective-mode-card__title">Modo Investigação</span>
+                  </div>
+                  <p className="detective-mode-card__desc">
+                    Você toma suas próprias notas. Sem ajuda. Sem rede de segurança.
+                  </p>
+                </button>
+              </div>
+              <button type="button" className="detective-guide-link" onClick={() => navigateDetectiveGuide()}>
+                O que é o Modo Detetive? →
               </button>
-              <button
-                type="button"
-                className="detective-mode-card ghost-btn"
-                onClick={() => {
-                  setSoloModeDifficulty("investigation");
-                  setDetectiveName(user?.displayName?.trim() ?? "");
-                  setView("detectiveName");
-                }}
-              >
-                <span className="btn-title">🔍 Modo Investigação</span>
-                <span className="btn-sub">Você toma suas próprias notas. Sem ajuda. Sem rede de segurança.</span>
-              </button>
+              {err && <p className="error">{err}</p>}
             </div>
-            <button type="button" className="detective-guide-link" onClick={() => navigateDetectiveGuide()}>
-              O que é o Modo Detetive? →
-            </button>
-            {err && <p className="error">{err}</p>}
           </div>
           {authModalElement}
         </>
@@ -1090,31 +1193,42 @@ export function App({ masterBootstrap }: AppProps = {}) {
               </span>
               <span className="top-bar-spacer" />
             </div>
-            <h2 className="h-display">Quem investiga Bucaré esta noite?</h2>
-            <p className="copy-muted">Este é o nome que os habitantes verão.</p>
-            <label className="field-label" htmlFor="detective-name">
-              Nome do detetive
-            </label>
-            <input
-              id="detective-name"
-              className="field-input"
-              placeholder="como quer ser chamado"
-              value={detectiveName}
-              onChange={(e) => setDetectiveName(e.target.value)}
-              maxLength={40}
-            />
-            {err && <p className="error">{err}</p>}
-            <button
-              type="button"
-              className="primary-btn"
-              disabled={anyPending || !detectiveName.trim() || !uid}
-              onClick={() => void startSoloDetective()}
-            >
-              <span className="btn-title btn-title-row">
-                {busy("startSoloDetective") ? "abrindo a cidade…" : "Começar investigação →"}
-                <BtnSpinner show={busy("startSoloDetective")} />
-              </span>
-            </button>
+            <div className="detective-setup-body">
+              <h2 className="h-display">Quem investiga Bucaré esta noite?</h2>
+              <p className="copy-muted">Este é o nome que os habitantes verão.</p>
+              <p className="detective-cordel-rule" aria-hidden>
+                ─────── ✦ ───────
+              </p>
+              <label className="field-label" htmlFor="detective-name">
+                Nome do detetive
+              </label>
+              <div className="detective-input-wrap">
+                <span className="detective-input-icon" aria-hidden>
+                  🔍
+                </span>
+                <input
+                  id="detective-name"
+                  className="field-input detective-input"
+                  placeholder="como quer ser chamado"
+                  value={detectiveName}
+                  onChange={(e) => setDetectiveName(e.target.value)}
+                  maxLength={40}
+                />
+              </div>
+              {err && <p className="error">{err}</p>}
+              <button
+                type="button"
+                className="primary-btn detective-flow-cta"
+                disabled={anyPending || !detectiveName.trim() || !uid}
+                onClick={() => void startSoloDetective()}
+              >
+                <span className="btn-title btn-title-row">
+                  {busy("startSoloDetective") ? "abrindo a cidade…" : "Começar investigação →"}
+                  <BtnSpinner show={busy("startSoloDetective")} />
+                </span>
+              </button>
+              <p className="detective-atmosphere">Bucaré aguarda.</p>
+            </div>
           </div>
           {authModalElement}
         </>
@@ -1771,7 +1885,28 @@ export function App({ masterBootstrap }: AppProps = {}) {
         </div>
       )}
 
-      {room?.status === "ended" && room?.soloMode && room.detectivePhase !== "done" && (
+      {showApocalypseInterstitial && apocalypseMsg && (
+        <ApocalypseInterstitial
+          message={apocalypseMsg}
+          onDone={() => {
+            sessionStorage.setItem(apocalypseInterstitialStorageKey(roomCode), "1");
+            setApocalypseInterstitialDone(true);
+          }}
+        />
+      )}
+
+      {showDetectiveEliminatedInterstitial && detectiveElimIntroMsg && (
+        <DetectiveEliminatedInterstitial
+          lead={detectiveElimIntroMsg.lead}
+          body={detectiveElimIntroMsg.body}
+          onDone={() => {
+            sessionStorage.setItem(detectiveElimIntroKey, "1");
+            setDetectiveElimIntroDone(true);
+          }}
+        />
+      )}
+
+      {showDetectiveEndFlowMidGame && room && (
         <Suspense fallback={null}>
           <DetectiveEndFlowLazy
             room={room}
@@ -1796,7 +1931,41 @@ export function App({ masterBootstrap }: AppProps = {}) {
         </Suspense>
       )}
 
-      {room?.status === "ended" && room && (!room.soloMode || room.detectivePhase === "done") && (
+      {showSoloDetectiveEnd && room && (
+        <Suspense fallback={null}>
+          <SoloDetectiveEndOrchestratorLazy
+            room={room}
+            roomCode={roomCode}
+            players={players}
+            playerId={playerId}
+            selfGlyph={glyph}
+            publicLog={publicLog}
+            myRole={myRole}
+            loreOpen={loreOpen}
+            setLoreOpen={setLoreOpen}
+            allRoundVotes={allRoundVotes}
+            allRoundBotVoteReasons={allRoundBotVoteReasons}
+            allNightActions={allNightActions}
+            historyLoaded={historyLoaded}
+            isHost={isHost}
+            anyPending={anyPending}
+            busy={busy}
+            run={run}
+            isAnonymous={isAnonymousUser}
+            onPlayAgain={() => {
+              leave();
+              setView("detectiveMode");
+              void beginGuestEntry("detective");
+            }}
+            onChangeMode={() => {
+              leave();
+              setView("detectiveMode");
+            }}
+          />
+        </Suspense>
+      )}
+
+      {showStandardEndScreens && room && !room.soloMode && (
         <EndScreen
           room={room}
           players={players}

@@ -120,6 +120,13 @@ export type RoomDoc = DocumentData & {
     calculatedAt?: unknown;
   } | null;
   detectivePhase?: "accusation" | "reveal" | "score" | "done" | null;
+  detectiveEliminatedAt?: number | { seconds: number; nanoseconds?: number } | null;
+  detectiveEliminationCause?: "night" | "vote" | "other";
+  detectiveGhostObservation?: boolean;
+  detectiveGhostObservationRound?: number;
+  apocalipseRoboDetected?: boolean;
+  apocalipseRoboPendingDay?: boolean;
+  apocalipseRoboAt?: number | { seconds: number; nanoseconds?: number } | null;
 };
 
 export type PlayerDoc = DocumentData & {

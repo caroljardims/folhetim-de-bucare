@@ -378,6 +378,18 @@ export const cangaceiroTiroCerto = onCall(async (req) => {
     await grantObjectiveMvp(code, me.id, round).catch(console.error);
   }
 
+  const snapsAfter = await loadPlayers(code);
+  const roomAfter = (await roomRef.get()).data() ?? {};
+  if (roomAfter.soloMode === true && targetRole === "detetive") {
+    const { markDetectiveEliminatedIfNeeded } = await import("../lib/detectiveElimination.js");
+    await markDetectiveEliminatedIfNeeded(code, "other", round, snapsAfter).catch(console.error);
+  }
+
+  const { markApocalypseRoboIfNeeded } = await import("../lib/apocalypseRobot.js");
+  if (await markApocalypseRoboIfNeeded(code, round, snapsAfter)) {
+    return { hit: creature, consulted, ended: false, apocalypsePending: true };
+  }
+
   const [snaps2, sec2] = await Promise.all([loadPlayers(code), loadSecrets(code)]);
   const winPlayers: Record<string, WinPlayerSnapshot> = {};
   for (const p of snaps2) {

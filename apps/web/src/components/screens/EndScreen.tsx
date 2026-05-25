@@ -14,6 +14,7 @@ import { stablePlayerGlyph } from "../../lib/playerGlyph.js";
 import { ROLE_DISPLAY, ROLE_LORE, RoleLoreContent } from "../../lib/roleStories.js";
 import { useGameSummary } from "../../hooks/useGameSummary.js";
 import type { PlayerDoc, PublicLogEntry, RoomDoc } from "../../types.js";
+import { FinalEditionNav } from "./FinalEditionNav.js";
 
 type NightActionRow = Record<
   string,
@@ -38,6 +39,11 @@ export type EndScreenProps = {
   busy: (key: string) => boolean;
   run: (fnName: string, data: Record<string, unknown>, pendingKey?: string) => Promise<Record<string, unknown>>;
   roomCode: string;
+  /** Solo orchestrator: render only manchete or chronicle slice. */
+  endSlice?: "full" | "manchete" | "chronicle";
+  hidePodium?: boolean;
+  hideInternalNav?: boolean;
+  editionProgress?: { current: number; total: number };
 };
 
 const SIDE_LABEL: Record<string, string> = {
@@ -85,21 +91,7 @@ function EndPagesNav({
   onNext: () => void;
 }) {
   return (
-    <footer className="fim-pages-footer">
-      <nav className="pages-nav" aria-label="Navegação da edição final">
-        <button type="button" className="pages-nav__btn" disabled={page === 0} onClick={onPrev}>
-          ← anterior
-        </button>
-        <div className="pages-dots" aria-hidden>
-          {([0, 1, 2] as const).map((i) => (
-            <span key={i} className={`pages-dot${page === i ? " pages-dot--on" : ""}`} />
-          ))}
-        </div>
-        <button type="button" className="pages-nav__btn" disabled={page === 2} onClick={onNext}>
-          próxima →
-        </button>
-      </nav>
-    </footer>
+    <FinalEditionNav page={page} pageCount={3} onPrev={onPrev} onNext={onNext} />
   );
 }
 
@@ -121,6 +113,10 @@ export function EndScreen({
   busy,
   run,
   roomCode,
+  endSlice = "full",
+  hidePodium = false,
+  hideInternalNav = false,
+  editionProgress,
 }: EndScreenProps) {
   const [endPage, setEndPage] = useState<0 | 1 | 2>(0);
   const gameId = typeof room.lastGameHistoryId === "string" ? room.lastGameHistoryId : undefined;
@@ -145,9 +141,128 @@ export function EndScreen({
     [players, publicLog],
   );
 
+  const showManchete = endSlice === "full" || endSlice === "manchete";
+  const showRevelacao = endSlice === "full";
+  const showCronica = endSlice === "full" || endSlice === "chronicle";
+  const editionLabel = editionProgress
+    ? `Edição final · ${editionProgress.current}/${editionProgress.total}`
+    : `Edição final · ${endPage + 1}/3`;
+
+  const mancheteSection = (
+    <section className="fim-page fim-page--manchete pageflip-enter" aria-label="Manchete final">
+      <FolhetimEdition
+        round={roundNum}
+        folhetim={{
+          manchete: manchete.manchete,
+          paragraphs: [manchete.body],
+          silentNight: false,
+        }}
+        lead="— a última edição —"
+        editionLabel="Edição final"
+        className="folhetim--fim-manchete papel-cai"
+        ariaLabel="Folhetim de Bucaré — última edição"
+      />
+      {endSlice === "full" && !hideInternalNav && (
+        <EndPagesNav page={0} onPrev={goPrev} onNext={goNext} />
+      )}
+    </section>
+  );
+
+  const cronicaSection = (
+    <section
+      className="fim-page fim-page--cronica pageflip-enter"
+      aria-label={hidePodium ? "Crônica da partida" : "Crônica e pódio"}
+    >
+      <p className="fim-section-eyebrow">
+        {hidePodium ? "II · a crônica" : "III · a crônica & o pódio"}
+      </p>
+
+      {!hidePodium && (
+        <>
+          <div className="podio fim-podio" aria-label="Pódio da partida">
+            {PODIUM_VISUAL.map(({ index, place }) => {
+              const row = podiumRows[index];
+              if (!row) {
+                return <div key={place} className={`podio__lugar podio__lugar--${place}`} aria-hidden />;
+              }
+              return (
+                <div key={row.playerId} className={`podio__lugar podio__lugar--${place}`}>
+                  <span className="podio__nome">{row.displayName}</span>
+                  <div className="podio__base">
+                    <span>{ROMAN[place - 1]}</span>
+                    <span className="podio__pts">
+                      {podiumHasPoints ? `${row.points} pts` : "—"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!summaryLoaded && podiumRows.length === 0 && (
+            <p className="muted fim-podio-loading">Carregando pontuação…</p>
+          )}
+          {summaryError && podiumRows.length === 0 && (
+            <p className="muted fim-podio-loading">{summaryError}</p>
+          )}
+          {summaryLoaded && podiumRows.length === 0 && !summaryError && (
+            <p className="muted fim-podio-loading">Resumo de pontos ainda não disponível.</p>
+          )}
+          {podiumRows.length > 0 && !podiumHasPoints && (
+            <p className="muted fim-podio-loading">
+              Pontuação detalhada indisponível — ordem por desempenho na mesa.
+            </p>
+          )}
+        </>
+      )}
+
+      <article className="folhetim folhetim--edition folhetim--fim-cronica folhetim-card">
+        <header className="fim-cronica-header">
+          <h2 className="fim-cronica-title">A crônica</h2>
+          <span className="fim-cronica-num">N.º {String(editionNum).padStart(2, "0")}</span>
+        </header>
+        <PartidaChronicle
+          room={room}
+          players={players}
+          publicLog={publicLog}
+          allRoundVotes={allRoundVotes}
+          allRoundBotVoteReasons={allRoundBotVoteReasons}
+          allNightActions={allNightActions}
+          historyLoaded={historyLoaded}
+          compact
+        />
+      </article>
+
+      {isHost && endSlice === "full" && (
+        <button
+          type="button"
+          className="btn-transicao fim-restart-btn"
+          disabled={anyPending}
+          onClick={() => void run("restartGame", { roomCode }, "restartGame").catch(() => {})}
+        >
+          <span className="btn-with-spinner">
+            {busy("restartGame") ? "reiniciando…" : "Jogar outra edição"}
+            <BtnSpinner show={busy("restartGame")} />
+          </span>
+        </button>
+      )}
+
+      {endSlice === "full" && !hideInternalNav && (
+        <EndPagesNav page={2} onPrev={goPrev} onNext={goNext} />
+      )}
+    </section>
+  );
+
+  if (endSlice === "manchete") {
+    return mancheteSection;
+  }
+
+  if (endSlice === "chronicle") {
+    return cronicaSection;
+  }
+
   return (
     <div className="screen screen--fim">
-      <p className="fim-edition-label">Edição final · {endPage + 1}/3</p>
+      <p className="fim-edition-label">{editionLabel}</p>
 
       {myRole && ROLE_LORE[myRole] && (
         <button
@@ -164,25 +279,9 @@ export function EndScreen({
         </div>
       )}
 
-      {endPage === 0 && (
-        <section className="fim-page fim-page--manchete pageflip-enter" aria-label="Manchete final">
-          <FolhetimEdition
-            round={roundNum}
-            folhetim={{
-              manchete: manchete.manchete,
-              paragraphs: [manchete.body],
-              silentNight: false,
-            }}
-            lead="— a última edição —"
-            editionLabel="Edição final"
-            className="folhetim--fim-manchete papel-cai"
-            ariaLabel="Folhetim de Bucaré — última edição"
-          />
-          <EndPagesNav page={0} onPrev={goPrev} onNext={goNext} />
-        </section>
-      )}
+      {endPage === 0 && showManchete && mancheteSection}
 
-      {endPage === 1 && (
+      {endPage === 1 && showRevelacao && (
         <section className="fim-page fim-page--revelacao pageflip-enter" aria-label="Revelação final">
           <p className="fim-section-eyebrow">II · a revelação</p>
           <p className="fim-section-tagline">agora a vila sabe quem era cada um.</p>
@@ -253,78 +352,7 @@ export function EndScreen({
         </section>
       )}
 
-      {endPage === 2 && (
-        <section className="fim-page fim-page--cronica pageflip-enter" aria-label="Crônica e pódio">
-          <p className="fim-section-eyebrow">III · a crônica &amp; o pódio</p>
-
-          <div className="podio fim-podio" aria-label="Pódio da partida">
-            {PODIUM_VISUAL.map(({ index, place }) => {
-              const row = podiumRows[index];
-              if (!row) {
-                return <div key={place} className={`podio__lugar podio__lugar--${place}`} aria-hidden />;
-              }
-              return (
-                <div key={row.playerId} className={`podio__lugar podio__lugar--${place}`}>
-                  <span className="podio__nome">{row.displayName}</span>
-                  <div className="podio__base">
-                    <span>{ROMAN[place - 1]}</span>
-                    <span className="podio__pts">
-                      {podiumHasPoints ? `${row.points} pts` : "—"}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {!summaryLoaded && podiumRows.length === 0 && (
-            <p className="muted fim-podio-loading">Carregando pontuação…</p>
-          )}
-          {summaryError && podiumRows.length === 0 && (
-            <p className="muted fim-podio-loading">{summaryError}</p>
-          )}
-          {summaryLoaded && podiumRows.length === 0 && !summaryError && (
-            <p className="muted fim-podio-loading">Resumo de pontos ainda não disponível.</p>
-          )}
-          {podiumRows.length > 0 && !podiumHasPoints && (
-            <p className="muted fim-podio-loading">Pontuação detalhada indisponível — ordem por desempenho na mesa.</p>
-          )}
-
-          <article className="folhetim folhetim--edition folhetim--fim-cronica folhetim-card">
-            <header className="fim-cronica-header">
-              <h2 className="fim-cronica-title">A crônica</h2>
-              <span className="fim-cronica-num">
-                N.º {String(editionNum).padStart(2, "0")}
-              </span>
-            </header>
-            <PartidaChronicle
-              room={room}
-              players={players}
-              publicLog={publicLog}
-              allRoundVotes={allRoundVotes}
-              allRoundBotVoteReasons={allRoundBotVoteReasons}
-              allNightActions={allNightActions}
-              historyLoaded={historyLoaded}
-              compact
-            />
-          </article>
-
-          {isHost && (
-            <button
-              type="button"
-              className="btn-transicao fim-restart-btn"
-              disabled={anyPending}
-              onClick={() => void run("restartGame", { roomCode }, "restartGame").catch(() => {})}
-            >
-              <span className="btn-with-spinner">
-                {busy("restartGame") ? "reiniciando…" : "Jogar outra edição"}
-                <BtnSpinner show={busy("restartGame")} />
-              </span>
-            </button>
-          )}
-
-          <EndPagesNav page={2} onPrev={goPrev} onNext={goNext} />
-        </section>
-      )}
+      {endPage === 2 && showCronica && cronicaSection}
     </div>
   );
 }

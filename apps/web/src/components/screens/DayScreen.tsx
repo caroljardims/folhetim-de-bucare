@@ -12,6 +12,9 @@ import type { ChatMessage, PlayerDoc, RoomDoc } from "../../types.js";
 import { groupChatByDay } from "../../lib/chatByDay.js";
 import { hasPendingVotingFinalize } from "../../lib/votingFinalize.js";
 import { BtnSpinner } from "../BtnSpinner.js";
+import { ApocalypseObservationPanel } from "../day/ApocalypseObservationPanel.js";
+import { DetectiveGhostObservationPanel } from "../day/DetectiveGhostObservationPanel.js";
+import { isDetectiveGhostObservation } from "../../lib/detectiveElimination.js";
 import { VotingFinalizeBanner } from "../day/VotingFinalizeBanner.js";
 import { VotingStatusPanel } from "../day/VotingStatusPanel.js";
 import { FolhetimOverlay } from "../FolhetimOverlay.js";
@@ -204,6 +207,10 @@ export function DayScreen({
   const allVotesIn =
     eligibleVoters.length === 0 ||
     eligibleVoters.every((p) => Object.hasOwn(dayRoundVotes, p.id ?? ""));
+  const otherEligibleVoters = eligibleVoters.filter((p) => p.id !== playerId);
+  const allOthersVotedIn =
+    otherEligibleVoters.length > 0 &&
+    otherEligibleVoters.every((p) => Object.hasOwn(dayRoundVotes, p.id ?? ""));
   const validExpulsionTargetIds = new Set(
     players.filter(canBeExpulsionVoteTarget).map((p) => p.id ?? ""),
   );
@@ -232,14 +239,35 @@ export function DayScreen({
     !(myPlayer.alive === false || myPlayer.eliminated || myPlayer.expelled) &&
     !myPlayer.silenced;
 
-  const votePending = canVote && room.votingOpen === true && !hasVoted;
+  const apocalypseObservation = room.apocalipseRoboPendingDay === true;
+  const detectiveGhostObservation = isDetectiveGhostObservation(room);
+  const spectatorObservation = apocalypseObservation || detectiveGhostObservation;
+  const votePending = canVote && room.votingOpen === true && !hasVoted && !spectatorObservation;
   const votingOpen = room.votingOpen === true;
+
+  const isSoloHuman = Boolean(room.soloMode && myPlayer && !myPlayer.isBot);
+
+  const showApocalypsePanel = apocalypseObservation && myPlayer && !myPlayer.isBot;
+  const showDetectiveGhostPanel =
+    detectiveGhostObservation && myPlayer && !myPlayer.isBot;
   const votingFinalizeActive = hasPendingVotingFinalize(room);
-  const hostMustVoteFirst = isHost && votingOpen && canVote && !hasVoted;
+  const hostMustVoteFirst =
+    isHost && votingOpen && canVote && !hasVoted && !room.soloMode;
+  /** Modo Detetive: só após votar ou se não pode votar (preso/seduzido/etc.). */
+  const soloShowEncerrarDia =
+    isSoloHuman &&
+    votingOpen &&
+    !spectatorObservation &&
+    (!canVote || hasVoted) &&
+    (allVotesIn || allOthersVotedIn);
   const showHostVotingControls =
-    isHost && votingOpen && !votingFinalizeActive && !hostMustVoteFirst;
-  const showHostRescueControls =
     isHost &&
+    !room.soloMode &&
+    votingOpen &&
+    !votingFinalizeActive &&
+    !hostMustVoteFirst;
+  const showHostRescueControls =
+    (isHost || isSoloHuman) &&
     !votingOpen &&
     !room.pendingNightStart &&
     !room.pendingBrasChoice &&
@@ -326,7 +354,7 @@ export function DayScreen({
       <div className="dia-scroll">
       <DayStages stage={dayStage} onStage={setDayStage} votePending={votePending} />
 
-      {isHost && votingOpen && (
+      {isHost && !room.soloMode && votingOpen && !spectatorObservation && (
         <section className="dia-host-bar" aria-label="Controles do anfitrião">
           {hostMustVoteFirst && (
             <p className="dia-host-bar__hint">
@@ -379,7 +407,7 @@ export function DayScreen({
         </section>
       )}
 
-      {votingOpen && (
+      {votingOpen && !spectatorObservation && (
         <VotingStatusPanel
           eligibleVoters={eligibleVoters}
           dayRoundVotes={dayRoundVotes}
@@ -441,15 +469,29 @@ export function DayScreen({
         </p>
       )}
 
-      {dayStage === 2 && canVote && room.votingOpen === true && (
+      {dayStage === 2 && canVote && room.votingOpen === true && !spectatorObservation && (
         <p className="dia-hint">A praça está agitada. Hora de votar.</p>
       )}
 
-      {dayStage === 2 && room.votingOpen === true && !canVote && (
+      {dayStage === 2 && room.votingOpen === true && !canVote && !spectatorObservation && (
         <p className="dia-status muted">Você não tem direito a voto nesta rodada.</p>
       )}
 
-      {canShowCangaceiroTiro(myRole, myPlayer) && (
+      {showApocalypsePanel && (
+        <ApocalypseObservationPanel room={room} roomCode={roomCode} run={run} busy={busy} />
+      )}
+
+      {showDetectiveGhostPanel && (
+        <DetectiveGhostObservationPanel
+          room={room}
+          roomCode={roomCode}
+          cause={room.detectiveEliminationCause}
+          run={run}
+          busy={busy}
+        />
+      )}
+
+      {canShowCangaceiroTiro(myRole, myPlayer) && !spectatorObservation && (
         <div className="dia-extra">
           <button
             type="button"
@@ -550,7 +592,7 @@ export function DayScreen({
 
       <div className="dia-bottom">
       <footer className="dia-footer">
-        {dayStage === 1 && votePending && (
+        {dayStage === 1 && votePending && !spectatorObservation && (
           <button
             type="button"
             className="btn-dia dia-footer__votar"
@@ -561,7 +603,7 @@ export function DayScreen({
           </button>
         )}
 
-        {votingOpen && hasVoted && !isHost && (
+        {votingOpen && hasVoted && !isHost && !spectatorObservation && (
           <p className="dia-footer__voted muted">
             {allVotesIn
               ? "Seu voto foi enviado. Aguardando o anfitrião encerrar a votação."
@@ -569,7 +611,7 @@ export function DayScreen({
           </p>
         )}
 
-        {room.votingOpen === true && canVote && dayStage === 2 && (
+        {room.votingOpen === true && canVote && dayStage === 2 && !spectatorObservation && (
           <>
             <button
               type="button"
@@ -649,6 +691,20 @@ export function DayScreen({
               </div>
             )}
           </>
+        )}
+
+        {soloShowEncerrarDia && (
+          <button
+            type="button"
+            className="dia-footer__apurar"
+            disabled={anyPending}
+            onClick={() => void run("advanceDay", { roomCode }, "advanceDay").catch(() => {})}
+          >
+            <span className="btn-with-spinner">
+              {busy("advanceDay") ? "aguarda…" : allVotesIn ? "Apurar votos →" : "Encerrar dia →"}
+              <BtnSpinner show={busy("advanceDay")} />
+            </span>
+          </button>
         )}
 
         {showHostRescueControls && (

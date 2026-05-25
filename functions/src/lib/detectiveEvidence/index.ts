@@ -1,6 +1,41 @@
+import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { ROLE_SIDE, displayRoleName, type RoleId } from "folclore-game-engine";
 import { loadPlayers, loadSecrets } from "../../helpers.js";
+import { db } from "../db.js";
 import { appendEvidence } from "./append.js";
+
+/** Player IDs who sent at least one non-vote chat message in the given day round. */
+export function speakerIdsFromChatDocs(
+  docs: QueryDocumentSnapshot[],
+  dayRound: number,
+): Set<string> {
+  const spoke = new Set<string>();
+  for (const doc of docs) {
+    const x = doc.data() as Record<string, unknown>;
+    const vrRaw = x.votesRound;
+    const votesRound = typeof vrRaw === "number" ? vrRaw : Number(vrRaw ?? NaN);
+    if (!Number.isFinite(votesRound) || votesRound !== dayRound) continue;
+    if (x.type === "vote") continue;
+    const text = String(x.text ?? "").trim();
+    if (!text) continue;
+    const pid = String(x.playerId ?? "");
+    if (pid) spoke.add(pid);
+  }
+  return spoke;
+}
+
+/** Bot IDs that had no non-vote chat message during the given day round. */
+export async function botIdsSilentInDayRound(
+  roomCode: string,
+  dayRound: number,
+  candidateBotIds: string[],
+): Promise<string[]> {
+  if (candidateBotIds.length === 0) return [];
+  const roomRef = db.collection("rooms").doc(roomCode);
+  const chatSnap = await roomRef.collection("chat").where("votesRound", "==", dayRound).get();
+  const spoke = speakerIdsFromChatDocs(chatSnap.docs, dayRound);
+  return candidateBotIds.filter((id) => !spoke.has(id));
+}
 
 export async function isStorySoloRoom(roomCode: string): Promise<{
   ok: boolean;
